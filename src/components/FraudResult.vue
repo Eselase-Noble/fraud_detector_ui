@@ -95,7 +95,6 @@ const formattedReason = computed(() =>
       </div>
     </div>
 
-
     <!-- SIGNALS -->
     <div v-if="result.signals?.length" class="mt-8">
       <h3 class="text-sm font-semibold text-gray-300 mb-3">
