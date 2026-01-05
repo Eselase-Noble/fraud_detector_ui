@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import TheNavbar from "@/components/TheNavbar.vue";
+import NavBar from "@/components/NavBar.vue";
 </script>
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black text-gray-100">
-    <TheNavbar />
+    <NavBar />
     <main class="pt-20">
       <RouterView />
     </main>
