@@ -15,3 +15,10 @@ export interface FraudResult {
   reason: string;
   signals: string[];
 }
+
+
+export interface FraudStats{
+  total_transactions: number,
+  suspicious_transactions: number,
+  fraud_rate: number,
+}
