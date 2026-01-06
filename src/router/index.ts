@@ -7,9 +7,7 @@ import Analytics from '@/views/Analytics.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    {
-      path: '/', component: Landing,
-    },
+    { path: '/', component: Landing},
     { path: "/detect", component: DetectFraud },
     { path: "/upload", component: UploadData },
     { path: "/analytics", component: Analytics }
