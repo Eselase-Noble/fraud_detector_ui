@@ -1,6 +1,8 @@
 <!--Landing.vue-->
 <script setup lang="ts">
-// Static landing page
+  defineOptions({
+    name: "Landing" // Multi-word name
+  })
 </script>
 
 <template>

@@ -1,20 +1,27 @@
-<!--Analytics.vue-->
+<!-- Analytics.vue -->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { getDashboard } from '@/api/analytics'
 import type { DashboardSummary } from '@/types/fraud'
 
+// Multi-word component name to satisfy ESLint
+defineOptions({
+  name: 'Analytics',
+})
+
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const days = ref(7)
+const days = ref<number>(7)
 
+// Load dashboard data
 const load = async () => {
   loading.value = true
   error.value = null
   try {
-    summary.value = await getDashboard(days.value)
-  } catch (err) {
+    // Ensure days.value is always a number
+    summary.value = await getDashboard(days.value ?? 7)
+  } catch {
     error.value = 'Failed to load dashboard data. Make sure the API is running.'
   } finally {
     loading.value = false
@@ -23,10 +30,21 @@ const load = async () => {
 
 onMounted(load)
 
-const fmt = (n: number) => n?.toLocaleString() ?? '—'
-const pct = (n: number) => n != null ? `${(n * 100).toFixed(1)}%` : '—'
-const money = (n: number) => n != null ? `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
+// Formatting helpers
+const fmt = (n: number | undefined) => n != null ? n.toLocaleString() : '—'
 
+const pct = (n: number | undefined) =>
+  n != null ? `${(n * 100).toFixed(1)}%` : '—'
+
+const money = (n: number | undefined) =>
+  n != null
+    ? `$${n.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+    : '—'
+
+// Score helpers
 const scoreColor = (score: number) => {
   if (score > 0.6) return 'text-red-400'
   if (score > 0.35) return 'text-yellow-400'
@@ -40,11 +58,15 @@ const scoreBarBg = (score: number) => {
 }
 
 // Sparkline helper: turn timeseries counts into an SVG polyline
-const sparklinePath = (series: { blocked: number }[], key: 'blocked' | 'reviewed' | 'allowed') => {
+const sparklinePath = (
+  series: { blocked: number; reviewed?: number; allowed?: number }[],
+  key: 'blocked' | 'reviewed' | 'allowed'
+) => {
   if (!series.length) return ''
-  const vals = series.map(d => (d as Record<string, number>)[key])
+  const vals: number[] = series.map(d => d[key] ?? 0)
   const max = Math.max(...vals, 1)
-  const w = 120, h = 32
+  const w = 120
+  const h = 32
   return vals
     .map((v, i) => `${(i / (vals.length - 1)) * w},${h - (v / max) * h}`)
     .join(' ')
