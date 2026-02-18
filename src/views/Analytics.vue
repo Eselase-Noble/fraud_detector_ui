@@ -14,7 +14,7 @@ const locations  = ref<LocationRisk[]>([])
 
 const loading = ref(true)
 const error   = ref<string | null>(null)
-const days    = ref<number>(30)
+const days    = ref<number>(7)
 
 // Active section tab
 type Tab = 'overview' | 'timeseries' | 'users' | 'locations'
