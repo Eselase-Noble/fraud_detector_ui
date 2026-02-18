@@ -7,7 +7,7 @@ import type { DashboardSummary } from '@/types/fraud'
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const days = ref(90)
+const days = ref(7)
 
 const load = async () => {
   loading.value = true
