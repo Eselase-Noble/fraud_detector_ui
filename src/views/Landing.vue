@@ -120,8 +120,17 @@
 
     <!-- FOOTER -->
     <footer class="py-16 text-center text-sm text-gray-500">
-      Built with FastAPI · PostgreSQL · LangChain · FAISS · Tavily · Vue 3 · TypeScript
+      &copy; 2026
+      <a href="https://nobleson.info" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-700">
+        Noble Eselase Vulley
+      </a>
+      and
+      <a href="https://africodelab.net" target="_blank" rel="noopener noreferrer" class="underline hover:text-gray-700">
+        AfricodeLab
+      </a>
+      · Built with FastAPI · PostgreSQL · LangChain · FAISS · Tavily · Vue 3 · TypeScript
     </footer>
+
   </section>
 </template>
 
