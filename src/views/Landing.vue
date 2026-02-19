@@ -1,7 +1,7 @@
 <!--Landing.vue-->
 <script setup lang="ts">
   defineOptions({
-    name: "Landing" // Multi-word name
+    name: "LandingPage" // Multi-word name
   })
 </script>
 
