@@ -104,10 +104,10 @@ const riskClass = (score: number) =>
 const riskBg = (score: number) =>
   score > 0.6 ? 'bg-red-400' : score > 0.35 ? 'bg-yellow-400' : 'bg-green-400'
 
-const decisionClass = (d: string) =>
-  d === 'BLOCK' ? 'text-red-400 bg-red-400/10 border-red-400/30'
-    : d === 'REVIEW' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30'
-      : 'text-green-400 bg-green-400/10 border-green-400/30'
+// const decisionClass = (d: string) =>
+//   d === 'BLOCK' ? 'text-red-400 bg-red-400/10 border-red-400/30'
+//     : d === 'REVIEW' ? 'text-yellow-400 bg-yellow-400/10 border-yellow-400/30'
+//       : 'text-green-400 bg-green-400/10 border-green-400/30'
 
 // Sparkline SVG points
 const sparkPoints = (key: 'blocked' | 'allowed') => {
