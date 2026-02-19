@@ -13,7 +13,7 @@ const topUsers   = ref<TopUser[]>([])
 const locations  = ref<LocationRisk[]>([])
 const loading    = ref(true)
 const error      = ref<string | null>(null)
-const days       = ref<number>(30)
+const days       = ref<number>(7)
 const clock      = ref('')
 const animIn     = ref(false)
 

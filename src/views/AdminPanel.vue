@@ -1,113 +1,116 @@
 <!-- AdminPanel.vue — Sentinel Operations Center -->
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { http } from '@/api/http'
+import { ref, onMounted } from 'vue'
+import {
+  getIntegrations,
+  createIntegration as createIntegrationAPI,
+  toggleIntegration as toggleIntegrationAPI,
+  deleteIntegration as deleteIntegrationAPI,
+  submitCaseReview,
+  getAuditLog,
+  updateUserRisk as updateUserRiskAPI,
+  type Integration,
+  type AuditEntry,
+  type RiskTier,
+} from '@/api/admin'
 
 defineOptions({ name: 'AdminPanel' })
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface Integration {
-  id: number
-  partner_name: string
-  webhook_url: string
-  is_active: boolean
-  notify_on: string[]
-  created_at: string
-  last_used_at: string | null
-  api_key?: string
-}
+/* ─────────────────────────────────────────────
+   Tabs
+───────────────────────────────────────────── */
 
-interface AuditEntry {
-  id: number
-  transaction_id: string
-  analyst_id: string | null
-  action: string
-  previous_decision: string | null
-  new_decision: string | null
-  note: string | null
-  created_at: string
-}
-
-// ─── State ───────────────────────────────────────────────────────────────────
 type Tab = 'integrations' | 'review' | 'audit' | 'users'
 const activeTab = ref<Tab>('integrations')
 
-// ── Integrations ─────────────────────────────────────────────────────────────
-const integrations     = ref<Integration[]>([])
-const intLoading       = ref(false)
-const newIntForm       = ref({ partner_name: '', webhook_url: '', notify_on: ['BLOCK', 'REVIEW'] })
-const creatingInt      = ref(false)
-const newlyCreatedKey  = ref<string | null>(null)
-const intError         = ref<string | null>(null)
-const showCreateForm   = ref(false)
-const togglingId       = ref<number | null>(null)
-const deletingId       = ref<number | null>(null)
+/* ─────────────────────────────────────────────
+   Helpers  (used in template — must be defined in script)
+───────────────────────────────────────────── */
 
-// ── Case Review ───────────────────────────────────────────────────────────────
-const reviewTxnId      = ref('')
-const reviewForm       = ref({ analyst_id: '', action: 'CONFIRM_FRAUD', new_decision: '', note: '' })
-const reviewing        = ref(false)
-const reviewResult     = ref<any>(null)
-const reviewError      = ref<string | null>(null)
+const fmtDate = (d: string | null): string =>
+  d ? new Date(d).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' }) : '—'
 
-// ── Audit Log ────────────────────────────────────────────────────────────────
-const auditLog         = ref<AuditEntry[]>([])
-const auditLoading     = ref(false)
-const auditFilter      = ref({ transaction_id: '', analyst_id: '', limit: 50, offset: 0 })
-const auditError       = ref<string | null>(null)
-const auditTotal       = ref(0)
+const decisionColor = (d?: string | null): string =>
+  ({ BLOCK: '#ff4444', REVIEW: '#f59e0b', ALLOW: '#10b981' })[d ?? ''] ?? '#5a6478'
 
-// ── User Risk ─────────────────────────────────────────────────────────────────
-const userRiskId       = ref('')
-const userRiskForm     = ref({ risk_tier: 'elevated', is_flagged: false, notes: '' })
-const updatingRisk     = ref(false)
-const userRiskResult   = ref<any>(null)
-const userRiskError    = ref<string | null>(null)
+const actionColor = (a: string): string =>
+  ({ CONFIRM_FRAUD: '#ff4444', CLEAR: '#10b981', ESCALATE: '#f59e0b', NOTE: '#6366f1' })[a] ?? '#5a6478'
 
-// ─── Integrations API ────────────────────────────────────────────────────────
+const tierColor = (t?: string): string =>
+  ({ high: '#ff4444', elevated: '#f59e0b', standard: '#10b981' })[t ?? ''] ?? '#5a6478'
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard?.writeText(text).catch(() => {/* silently fail in non-HTTPS */ })
+}
+
+/* ─────────────────────────────────────────────
+   Integrations
+───────────────────────────────────────────── */
+
+const integrations    = ref<Integration[]>([])
+const intLoading      = ref(false)
+const newIntForm      = ref({ partner_name: '', webhook_url: '', notify_on: ['BLOCK', 'REVIEW'] })
+const creatingInt     = ref(false)
+const newlyCreatedKey = ref<string | null>(null)
+const intError        = ref<string | null>(null)
+const showCreateForm  = ref(false)
+const togglingId      = ref<number | null>(null)
+const deletingId      = ref<number | null>(null)
+
 const loadIntegrations = async () => {
   intLoading.value = true
+  intError.value   = null
   try {
-    const r = await http.get('/admin/integrations')
-    integrations.value = r.data
+    integrations.value = await getIntegrations()
   } catch (e: any) {
     intError.value = e?.response?.data?.detail ?? 'Failed to load integrations.'
-  } finally { intLoading.value = false }
+  } finally {
+    intLoading.value = false
+  }
 }
 
 const createIntegration = async () => {
   if (!newIntForm.value.partner_name.trim() || !newIntForm.value.webhook_url.trim()) return
-  creatingInt.value    = true
+  creatingInt.value     = true
   newlyCreatedKey.value = null
   intError.value        = null
   try {
-    const r = await http.post('/admin/integrations', newIntForm.value)
-    newlyCreatedKey.value = r.data.api_key
+    const data = await createIntegrationAPI(newIntForm.value)
+    newlyCreatedKey.value = data.api_key ?? null
     newIntForm.value = { partner_name: '', webhook_url: '', notify_on: ['BLOCK', 'REVIEW'] }
-    showCreateForm.value = false
+    showCreateForm.value  = false
     await loadIntegrations()
-  } catch (e: any) {
-    intError.value = e?.response?.data?.detail ?? 'Failed to create integration.'
-  } finally { creatingInt.value = false }
+  } catch (e: unknown) {
+    // Type guard to safely access properties
+    if (e && typeof e === 'object' && 'response' in e) {
+      intError.value = (e as any).response?.data?.detail ?? 'Failed to load integrations.';
+    } else {
+      intError.value = 'Failed to load integrations.';
+    }
+  } finally {
+    creatingInt.value = false
+  }
 }
 
 const toggleIntegration = async (id: number) => {
   togglingId.value = id
   try {
-    await http.patch(`/admin/integrations/${id}/toggle`)
+    await toggleIntegrationAPI(id)
     await loadIntegrations()
-  } catch { /* ignore */ }
-  finally { togglingId.value = null }
+  } finally {
+    togglingId.value = null
+  }
 }
 
 const deleteIntegration = async (id: number) => {
   if (!confirm('Remove this integration? Webhook delivery will stop immediately.')) return
   deletingId.value = id
   try {
-    await http.delete(`/admin/integrations/${id}`)
+    await deleteIntegrationAPI(id)
     await loadIntegrations()
-  } catch { /* ignore */ }
-  finally { deletingId.value = null }
+  } finally {
+    deletingId.value = null
+  }
 }
 
 const toggleNotify = (decision: string) => {
@@ -116,41 +119,61 @@ const toggleNotify = (decision: string) => {
   else newIntForm.value.notify_on.push(decision)
 }
 
-// ─── Case Review API ─────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Case Review
+───────────────────────────────────────────── */
+
+const reviewTxnId  = ref('')
+const reviewForm   = ref({ analyst_id: '', action: 'CONFIRM_FRAUD', new_decision: '', note: '' })
+const reviewing    = ref(false)
+const reviewResult = ref<any>(null)
+const reviewError  = ref<string | null>(null)
+
 const submitReview = async () => {
   if (!reviewTxnId.value.trim() || !reviewForm.value.analyst_id.trim()) return
   reviewing.value    = true
   reviewError.value  = null
   reviewResult.value = null
   try {
-    const payload: any = {
-      analyst_id: reviewForm.value.analyst_id,
-      action: reviewForm.value.action,
-      note: reviewForm.value.note || null,
-    }
-    if (reviewForm.value.new_decision) payload.new_decision = reviewForm.value.new_decision
-    const r = await http.post(`/admin/review/${reviewTxnId.value.trim()}`, payload)
-    reviewResult.value = r.data
+    reviewResult.value = await submitCaseReview(reviewTxnId.value.trim(), {
+      analyst_id:   reviewForm.value.analyst_id,
+      action:       reviewForm.value.action,
+      new_decision: reviewForm.value.new_decision || undefined,
+      note:         reviewForm.value.note         || null,
+    })
     await loadAuditLog()
   } catch (e: any) {
     reviewError.value = e?.response?.data?.detail ?? 'Review submission failed.'
-  } finally { reviewing.value = false }
+  } finally {
+    reviewing.value = false
+  }
 }
 
-// ─── Audit Log API ───────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   Audit Log
+───────────────────────────────────────────── */
+
+const auditLog     = ref<AuditEntry[]>([])
+const auditLoading = ref(false)
+const auditError   = ref<string | null>(null)
+const auditFilter  = ref({ transaction_id: '', analyst_id: '', limit: 50, offset: 0 })
+
 const loadAuditLog = async () => {
   auditLoading.value = true
   auditError.value   = null
   try {
-    const params: any = { limit: auditFilter.value.limit, offset: auditFilter.value.offset }
-    if (auditFilter.value.transaction_id) params.transaction_id = auditFilter.value.transaction_id
-    if (auditFilter.value.analyst_id)     params.analyst_id     = auditFilter.value.analyst_id
-    const r = await http.get('/admin/audit_log', { params })
-    auditLog.value   = r.data
-    auditTotal.value = r.data.length
+    auditLog.value = await getAuditLog(auditFilter.value)
   } catch (e: any) {
     auditError.value = e?.response?.data?.detail ?? 'Failed to load audit log.'
-  } finally { auditLoading.value = false }
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+// Dedicated clear function — avoids trying to reassign the ref itself in the template
+const clearAuditFilter = () => {
+  auditFilter.value = { transaction_id: '', analyst_id: '', limit: 50, offset: 0 }
+  loadAuditLog()
 }
 
 const auditPage = (dir: 1 | -1) => {
@@ -158,46 +181,38 @@ const auditPage = (dir: 1 | -1) => {
   loadAuditLog()
 }
 
-// ─── User Risk API ────────────────────────────────────────────────────────────
+/* ─────────────────────────────────────────────
+   User Risk
+───────────────────────────────────────────── */
+
+const userRiskId     = ref('')
+// Type the risk_tier field explicitly so the tier button assignment is type-safe
+const userRiskForm   = ref<{ risk_tier: RiskTier; is_flagged: boolean; notes: string }>({
+  risk_tier:  'elevated',
+  is_flagged: false,
+  notes:      '',
+})
+const updatingRisk   = ref(false)
+const userRiskResult = ref<any>(null)
+const userRiskError  = ref<string | null>(null)
+
 const updateUserRisk = async () => {
   if (!userRiskId.value.trim()) return
-  updatingRisk.value    = true
-  userRiskError.value   = null
-  userRiskResult.value  = null
+  updatingRisk.value   = true
+  userRiskError.value  = null
+  userRiskResult.value = null
   try {
-    const r = await http.patch(`/admin/users/${userRiskId.value.trim()}/risk`, {
+    userRiskResult.value = await updateUserRiskAPI(userRiskId.value.trim(), {
       risk_tier:  userRiskForm.value.risk_tier,
       is_flagged: userRiskForm.value.is_flagged,
       notes:      userRiskForm.value.notes || null,
     })
-    userRiskResult.value = r.data
   } catch (e: any) {
     userRiskError.value = e?.response?.data?.detail ?? 'Update failed.'
-  } finally { updatingRisk.value = false }
+  } finally {
+    updatingRisk.value = false
+  }
 }
-
-// ─── Format helpers ───────────────────────────────────────────────────────────
-const fmtDate = (d: string | null) =>
-  d ? new Date(d).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' }) : '—'
-
-const decisionColor = (d?: string | null) => ({
-  BLOCK:  '#ff4444',
-  REVIEW: '#f59e0b',
-  ALLOW:  '#10b981',
-})[d ?? ''] ?? '#5a6478'
-
-const actionColor = (a: string) => ({
-  CONFIRM_FRAUD: '#ff4444',
-  CLEAR:         '#10b981',
-  ESCALATE:      '#f59e0b',
-  NOTE:          '#6366f1',
-})[a] ?? '#5a6478'
-
-const tierColor = (t?: string) => ({
-  high:     '#ff4444',
-  elevated: '#f59e0b',
-  standard: '#10b981',
-})[t ?? ''] ?? '#5a6478'
 
 onMounted(() => {
   loadIntegrations()
@@ -234,15 +249,17 @@ onMounted(() => {
 
       <!-- ── Tab nav ────────────────────────────────────────────────────── -->
       <nav class="tab-bar">
-        <button v-for="(tab, i) in [
-          { id:'integrations', icon:'◈', label:'Partner Integrations' },
-          { id:'review',       icon:'◎', label:'Case Review' },
-          { id:'audit',        icon:'▲', label:'Audit Log' },
-          { id:'users',        icon:'◉', label:'User Risk' },
-        ]" :key="tab.id"
-                @click="activeTab = tab.id as Tab"
-                :class="['tab', activeTab === tab.id && 'active']"
-                :style="`animation-delay:${i * 0.06}s`"
+        <button
+          v-for="(tab, i) in [
+            { id:'integrations', icon:'◈', label:'Partner Integrations' },
+            { id:'review',       icon:'◎', label:'Case Review' },
+            { id:'audit',        icon:'▲', label:'Audit Log' },
+            { id:'users',        icon:'◉', label:'User Risk' },
+          ]"
+          :key="tab.id"
+          @click="activeTab = tab.id as Tab"
+          :class="['tab', activeTab === tab.id && 'active']"
+          :style="`animation-delay:${i * 0.06}s`"
         >
           <span class="tab-glyph">{{ tab.icon }}</span>
           {{ tab.label }}
@@ -263,7 +280,7 @@ onMounted(() => {
           <p class="akr-warn">This key is shown <strong>once only</strong> and never stored in plaintext. Copy it now.</p>
           <div class="akr-key-row">
             <code class="akr-key">{{ newlyCreatedKey }}</code>
-            <button class="akr-copy" @click="navigator.clipboard?.writeText(newlyCreatedKey!)">Copy</button>
+            <button class="akr-copy" @click="copyToClipboard(newlyCreatedKey!)">Copy</button>
           </div>
         </div>
 
@@ -304,7 +321,11 @@ onMounted(() => {
             </div>
           </div>
           <div v-if="intError" class="inline-error">⚠ {{ intError }}</div>
-          <button @click="createIntegration" :disabled="creatingInt || !newIntForm.partner_name || !newIntForm.webhook_url" class="primary-btn">
+          <button
+            @click="createIntegration"
+            :disabled="creatingInt || !newIntForm.partner_name || !newIntForm.webhook_url"
+            class="primary-btn"
+          >
             <span v-if="!creatingInt">Create Integration</span>
             <span v-else class="btn-loading"><span class="btn-spinner"/>Creating…</span>
           </button>
@@ -454,11 +475,16 @@ onMounted(() => {
                 </span>
               </div>
               <div class="rc-grid">
-                <div class="rcg-item"><span class="rcg-lbl">Transaction</span><span class="rcg-val mono">{{ reviewResult.transaction_id }}</span></div>
-                <div class="rcg-item"><span class="rcg-lbl">Previous</span>
+                <div class="rcg-item">
+                  <span class="rcg-lbl">Transaction</span>
+                  <span class="rcg-val mono">{{ reviewResult.transaction_id }}</span>
+                </div>
+                <div class="rcg-item">
+                  <span class="rcg-lbl">Previous</span>
                   <span class="rcg-val" :style="{ color: decisionColor(reviewResult.previous_decision) }">{{ reviewResult.previous_decision }}</span>
                 </div>
-                <div class="rcg-item"><span class="rcg-lbl">New Decision</span>
+                <div class="rcg-item">
+                  <span class="rcg-lbl">New Decision</span>
                   <span class="rcg-val" :style="{ color: decisionColor(reviewResult.new_decision) }">{{ reviewResult.new_decision }}</span>
                 </div>
               </div>
@@ -514,7 +540,8 @@ onMounted(() => {
             <span v-if="!auditLoading">⌕ Filter</span>
             <span v-else class="btn-loading"><span class="btn-spinner"/>Loading…</span>
           </button>
-          <button @click="() => { auditFilter = { transaction_id:'', analyst_id:'', limit:50, offset:0 }; loadAuditLog() }" class="ghost-btn">✕ Clear</button>
+          <!-- Fixed: was trying to reassign the ref directly in the template -->
+          <button @click="clearAuditFilter" class="ghost-btn">✕ Clear</button>
         </div>
 
         <div v-if="auditError" class="inline-error">⚠ {{ auditError }}</div>
@@ -612,7 +639,7 @@ onMounted(() => {
                   <label class="field-label">RISK TIER</label>
                   <div class="tier-selector">
                     <button
-                      v-for="t in ['standard','elevated','high']" :key="t"
+                      v-for="t in (['standard','elevated','high'] as RiskTier[])" :key="t"
                       @click="userRiskForm.risk_tier = t"
                       class="tier-btn"
                       :class="{ active: userRiskForm.risk_tier === t }"
@@ -620,7 +647,7 @@ onMounted(() => {
                     >
                       <span class="tier-dot" :style="{ background: tierColor(t) }"/>
                       {{ t.toUpperCase() }}
-                      <span class="tier-score">+{{ t==='standard'?'5':t==='elevated'?'15':'30' }}%</span>
+                      <span class="tier-score">+{{ t === 'standard' ? '5' : t === 'elevated' ? '15' : '30' }}%</span>
                     </button>
                   </div>
                 </div>
@@ -796,10 +823,7 @@ onMounted(() => {
 .section-sub   { font-size: 11px; color: var(--muted); font-family: var(--ff-mono); }
 
 /* API key reveal */
-.api-key-reveal {
-  background: rgba(16,185,129,.07); border: 1px solid rgba(16,185,129,.25);
-  border-radius: 12px; padding: 18px 20px; animation: fadein .3s ease;
-}
+.api-key-reveal { background: rgba(16,185,129,.07); border: 1px solid rgba(16,185,129,.25); border-radius: 12px; padding: 18px 20px; animation: fadein .3s ease; }
 .akr-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .akr-title  { font-size: 12px; font-weight: 700; color: var(--success); }
 .akr-dismiss{ background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; }
@@ -831,19 +855,12 @@ onMounted(() => {
 
 /* Notify chips */
 .notify-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.notify-chip {
-  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border);
-  background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer;
-  font-size: 10px; font-weight: 700; letter-spacing: .1em; font-family: var(--ff-mono); transition: all .2s;
-}
+.notify-chip { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .1em; font-family: var(--ff-mono); transition: all .2s; }
 .notify-chip.active { border-color: var(--chip-c, var(--accent)); color: var(--chip-c, var(--accent)); background: color-mix(in srgb, var(--chip-c, var(--accent)) 15%, transparent); }
 
 /* Integration grid */
 .int-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px,1fr)); gap: 14px; }
-.int-card {
-  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-  padding: 20px 22px; transition: border-color .2s;
-}
+.int-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; transition: border-color .2s; }
 .int-card:hover { border-color: var(--border2); }
 .int-card.inactive { opacity: .6; }
 .ic-header  { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -871,7 +888,7 @@ onMounted(() => {
 .status-active { color: var(--success); }
 .status-inactive { color: var(--muted); }
 
-/* Primary button */
+/* Buttons */
 .primary-btn { padding: 12px 24px; border-radius: 9px; border: none; background: var(--accent); color: #fff; font-weight: 700; font-size: 12px; cursor: pointer; letter-spacing: .06em; font-family: var(--ff-sans); transition: all .25s; align-self: flex-start; }
 .primary-btn:hover:not(:disabled) { background: #4f46e5; box-shadow: 0 0 28px rgba(99,102,241,.4); }
 .primary-btn:disabled { opacity: .4; cursor: not-allowed; }
@@ -881,15 +898,14 @@ onMounted(() => {
 .ghost-btn { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; font-size: 11px; font-family: var(--ff-mono); transition: all .2s; white-space: nowrap; align-self: flex-end; }
 .ghost-btn:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,.05); }
 .ghost-btn:disabled { opacity: .4; cursor: not-allowed; }
-
 .btn-loading { display: flex; align-items: center; gap: 8px; }
 .btn-spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid rgba(255,255,255,.25); border-top-color: #fff; animation: spin 1s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* Result card */
-.result-card { border-radius: 10px; border: 1px solid; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; animation: fadein .3s ease; }
-.success-card{ border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.05); }
-.error-card  { border-color: rgba(255,68,68,.25);  background: rgba(255,68,68,.05); }
+.result-card  { border-radius: 10px; border: 1px solid; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; animation: fadein .3s ease; }
+.success-card { border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.05); }
+.error-card   { border-color: rgba(255,68,68,.25);  background: rgba(255,68,68,.05); }
 @keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 .rc-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .rc-status  { font-size: 10px; font-weight: 700; letter-spacing: .15em; font-family: var(--ff-mono); }
@@ -936,6 +952,7 @@ onMounted(() => {
 
 /* Table */
 .table-wrap { overflow-x: auto; }
+.overflow-x-auto { overflow-x: auto; }
 .dt { width: 100%; border-collapse: collapse; font-size: 12px; }
 .dt th { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 8px; letter-spacing: .18em; font-weight: 700; color: var(--muted); white-space: nowrap; font-family: var(--ff-mono); }
 .dt td { padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.03); white-space: nowrap; transition: background .15s; }
@@ -944,7 +961,6 @@ onMounted(() => {
 .dt .mono   { font-family: var(--ff-mono); }
 .dt .muted  { color: var(--dimmed); }
 .note-cell  { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--ff-mono); font-size: 11px; }
-.overflow-x-auto { overflow-x: auto; }
 
 /* Pagination */
 .pagination { display: flex; align-items: center; gap: 12px; justify-content: center; padding-top: 18px; border-top: 1px solid var(--border); margin-top: 12px; }
@@ -952,12 +968,7 @@ onMounted(() => {
 
 /* Tier selector */
 .tier-selector { display: flex; gap: 6px; flex-wrap: wrap; }
-.tier-btn {
-  display: flex; align-items: center; gap: 7px; padding: 9px 16px;
-  border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,.04);
-  color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700;
-  letter-spacing: .1em; font-family: var(--ff-mono); transition: all .2s;
-}
+.tier-btn { display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .1em; font-family: var(--ff-mono); transition: all .2s; }
 .tier-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .tier-score { font-size: 8px; opacity: .6; margin-left: 2px; }
 .tier-btn.active { box-shadow: 0 0 16px rgba(0,0,0,.3); }
@@ -965,11 +976,7 @@ onMounted(() => {
 /* Checkbox */
 .checkbox-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 12px; color: var(--dimmed); user-select: none; }
 .checkbox-input { display: none; }
-.checkbox-custom {
-  width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border);
-  background: rgba(255,255,255,.04); flex-shrink: 0; transition: all .2s;
-  position: relative;
-}
+.checkbox-custom { width: 16px; height: 16px; border-radius: 4px; border: 1px solid var(--border); background: rgba(255,255,255,.04); flex-shrink: 0; transition: all .2s; position: relative; }
 .checkbox-custom.checked { background: var(--danger); border-color: var(--danger); }
 .checkbox-custom.checked::after { content: '✓'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; }
 .flag-desc { font-size: 10px; color: var(--muted); font-family: var(--ff-mono); }

@@ -27,11 +27,13 @@ export interface AuditEntry {
   created_at: string
 }
 
+export type RiskTier = 'standard' | 'elevated' | 'high'
+
 /* ─────────────────────────────────────────────
    Integrations
 ───────────────────────────────────────────── */
 
-export const getIntegrations = async () => {
+export const getIntegrations = async (): Promise<Integration[]> => {
   const { data } = await http.get<Integration[]>('/admin/integrations')
   return data
 }
@@ -40,16 +42,16 @@ export const createIntegration = async (payload: {
   partner_name: string
   webhook_url: string
   notify_on: string[]
-}) => {
-  const { data } = await http.post('/admin/integrations', payload)
+}): Promise<Integration> => {
+  const { data } = await http.post<Integration>('/admin/integrations', payload)
   return data
 }
 
-export const toggleIntegration = async (id: number) => {
+export const toggleIntegration = async (id: number): Promise<void> => {
   await http.patch(`/admin/integrations/${id}/toggle`)
 }
 
-export const deleteIntegration = async (id: number) => {
+export const deleteIntegration = async (id: number): Promise<void> => {
   await http.delete(`/admin/integrations/${id}`)
 }
 
@@ -66,10 +68,7 @@ export const submitCaseReview = async (
     note?: string | null
   }
 ) => {
-  const { data } = await http.post(
-    `/admin/review/${transactionId}`,
-    payload
-  )
+  const { data } = await http.post(`/admin/review/${transactionId}`, payload)
   return data
 }
 
@@ -83,10 +82,16 @@ export const getAuditLog = async (params: {
   limit: number
   offset: number
 }) => {
-  const { data } = await http.get<AuditEntry[]>(
-    '/admin/audit_log',
-    { params }
-  )
+  // Only send optional filters if they have a non-empty value —
+  // sending transaction_id='' would filter to zero results on the backend
+  const query: Record<string, string | number> = {
+    limit: params.limit,
+    offset: params.offset,
+  }
+  if (params.transaction_id?.trim()) query.transaction_id = params.transaction_id.trim()
+  if (params.analyst_id?.trim())     query.analyst_id     = params.analyst_id.trim()
+
+  const { data } = await http.get<AuditEntry[]>('/admin/audit_log', { params: query })
   return data
 }
 
@@ -97,14 +102,11 @@ export const getAuditLog = async (params: {
 export const updateUserRisk = async (
   userId: string,
   payload: {
-    risk_tier: string
+    risk_tier: RiskTier
     is_flagged: boolean
     notes?: string | null
   }
 ) => {
-  const { data } = await http.patch(
-    `/admin/users/${userId}/risk`,
-    payload
-  )
+  const { data } = await http.patch(`/admin/users/${userId}/risk`, payload)
   return data
 }
