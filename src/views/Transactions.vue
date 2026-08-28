@@ -2,11 +2,14 @@
 import { onMounted, ref } from 'vue'
 import { getAllTransactions, detectFraud } from '@/api/transactions'
 import type { Transaction, FraudResult } from '@/types/fraud'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/lib/usePagination'
 
 defineOptions({ name: 'TransactionsView' })
 
 const rows = ref<Transaction[]>([])
 const loading = ref(true)
+const { page, pageSize, total, pageCount, from, to, paged } = usePagination(rows, 25)
 const decision = ref<'' | 'ALLOW' | 'REVIEW' | 'BLOCK'>('')
 const userId = ref('')
 const selected = ref<Transaction | null>(null)
@@ -24,7 +27,7 @@ const load = async () => {
   loading.value = true
   try {
     rows.value = await getAllTransactions({
-      limit: 100,
+      limit: 500,
       decision: decision.value || undefined,
       user_id: userId.value.trim() || undefined,
     })
@@ -70,13 +73,14 @@ const openRow = async (t: Transaction) => {
       <input v-model="userId" @keyup.enter="load" placeholder="Filter by user id…"
         class="h-9 px-3 text-sm bg-white border border-slate-300 rounded-md w-56" />
       <button @click="load" class="h-9 px-3.5 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700">Apply</button>
-      <span class="ml-auto text-xs text-slate-400">{{ loading ? 'Loading…' : `${rows.length} transactions` }}</span>
+      <span class="ml-auto text-xs text-slate-400">{{ loading ? 'Loading…' : `${total} transactions` }}</span>
     </div>
 
     <div class="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4">
       <!-- Table -->
       <div class="rounded-xl bg-white border border-slate-200 overflow-hidden">
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[720px]">
           <thead>
             <tr class="text-2xs uppercase tracking-wide text-slate-400 bg-slate-50">
               <th class="text-left px-4 py-2.5 font-semibold">User</th>
@@ -86,7 +90,7 @@ const openRow = async (t: Transaction) => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="t in rows" :key="t.transaction_id" @click="openRow(t)"
+            <tr v-for="t in paged" :key="t.transaction_id" @click="openRow(t)"
               class="border-t border-slate-50 cursor-pointer hover:bg-slate-50"
               :class="selected?.transaction_id === t.transaction_id && 'bg-indigo-50/50'">
               <td class="px-4 py-2.5">
@@ -100,6 +104,10 @@ const openRow = async (t: Transaction) => {
             <tr v-if="!rows.length && !loading"><td colspan="4" class="px-4 py-10 text-center text-slate-400">No transactions match.</td></tr>
           </tbody>
         </table>
+        </div>
+        <Pagination v-if="!loading && rows.length" :page="page" :page-size="pageSize" :total="total"
+          :from="from" :to="to" :page-count="pageCount" noun="transactions"
+          @update:page="page = $event" @update:page-size="pageSize = $event" />
       </div>
 
       <!-- Detail / assessment -->

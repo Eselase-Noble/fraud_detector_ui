@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { listStaff, createStaff, updateStaff, deleteStaff, type StaffUserFull } from '@/api/platform'
 import { staffUser } from '@/platform/auth'
 import SectionCard from '@/components/ui/SectionCard.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/lib/usePagination'
 import { confirm } from '@/lib/confirm'
 import { toast } from '@/lib/toast'
 
@@ -13,6 +15,7 @@ const meId = computed(() => staffUser.value?.id)
 const rows = ref<StaffUserFull[]>([])
 const loading = ref(true)
 const error = ref('')
+const { page, pageSize, total, pageCount, from, to, paged } = usePagination(rows, 25)
 const showForm = ref(false)
 const form = ref({ email: '', name: '', role: 'operator', password: '' })
 const saving = ref(false)
@@ -109,7 +112,7 @@ const roleTone: Record<string, string> = {
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
-          <tr v-for="u in rows" :key="u.id" class="hover:bg-slate-50/60">
+          <tr v-for="u in paged" :key="u.id" class="hover:bg-slate-50/60">
             <td class="px-4 py-3">
               <div class="font-medium text-slate-800">{{ u.name || u.email }}<span v-if="u.id === meId" class="ml-1.5 text-[10px] font-semibold text-indigo-600">you</span></div>
               <div class="text-xs text-slate-400">{{ u.email }}</div>
@@ -138,6 +141,9 @@ const roleTone: Record<string, string> = {
         </tbody>
       </table>
       </div>
+      <Pagination v-if="!loading && rows.length" :page="page" :page-size="pageSize" :total="total"
+        :from="from" :to="to" :page-count="pageCount" noun="staff"
+        @update:page="page = $event" @update:page-size="pageSize = $event" />
     </SectionCard>
   </div>
 </template>

@@ -71,7 +71,8 @@ const entries = () =>
       <!-- History -->
       <div class="rounded-xl bg-white border border-slate-200 overflow-hidden lg:col-span-2">
         <div class="px-4 py-3 border-b border-slate-100 text-sm font-medium text-slate-700">Recent transactions ({{ history.length }})</div>
-        <table class="w-full text-sm">
+        <div class="overflow-x-auto">
+        <table class="w-full text-sm min-w-[520px]">
           <thead>
             <tr class="text-2xs uppercase tracking-wide text-slate-400 bg-slate-50">
               <th class="text-left px-4 py-2 font-semibold">When</th>
@@ -88,6 +89,7 @@ const entries = () =>
             <tr v-if="!history.length"><td colspan="3" class="px-4 py-6 text-center text-slate-400">No history.</td></tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>

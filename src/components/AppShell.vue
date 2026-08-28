@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { http } from '@/api/http'
 import { staffUser, clearStaffToken } from '@/platform/auth'
 import { toast } from '@/lib/toast'
+import { confirm } from '@/lib/confirm'
 
 defineOptions({ name: 'AppShell' })
 const route = useRoute()
@@ -50,7 +51,10 @@ const status = ref<'ok' | 'down' | 'checking'>('checking')
 
 const pageTitle = computed(() => (route.meta.title as string)?.replace('Sentinel — ', '') || 'Console')
 
-const signOut = () => { clearStaffToken(); toast.success('Signed out'); setTimeout(() => window.location.assign('/platform'), 300) }
+const signOut = async () => {
+  if (!(await confirm({ title: 'Sign out?', message: 'You’ll need to sign in again to access the console.', confirmLabel: 'Sign out' }))) return
+  clearStaffToken(); toast.success('Signed out'); setTimeout(() => window.location.assign('/platform'), 300)
+}
 
 const checkHealth = async () => {
   try {

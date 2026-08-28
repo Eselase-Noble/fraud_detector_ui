@@ -131,7 +131,7 @@ const shortDate = (s: string) => { try { return new Date(s).toLocaleDateString(u
       <!-- Locations -->
       <SectionCard title="Risk by location">
         <div v-if="!locations.length" class="py-8 text-center text-sm text-slate-400">No location data.</div>
-        <table v-else class="w-full text-sm">
+        <div v-else class="overflow-x-auto"><table class="w-full text-sm min-w-[640px]">
           <thead>
             <tr class="text-[11px] uppercase tracking-wide text-slate-400 border-b border-slate-100">
               <th class="text-left py-2 font-semibold">Location</th>
@@ -158,6 +158,7 @@ const shortDate = (s: string) => { try { return new Date(s).toLocaleDateString(u
             </tr>
           </tbody>
         </table>
+        </div>
       </SectionCard>
     </template>
   </div>

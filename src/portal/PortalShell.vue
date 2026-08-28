@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { PortalProfile } from '@/portal/types'
 import { institutionLabel, connectionLabel } from '@/lib/connectivity'
 import { toast } from '@/lib/toast'
+import { confirm } from '@/lib/confirm'
 import Overview from '@/portal/views/Overview.vue'
 import PortalTransactions from '@/portal/views/PortalTransactions.vue'
 import PortalAnalytics from '@/portal/views/PortalAnalytics.vue'
@@ -25,7 +26,10 @@ const active = ref('overview')
 const mobileOpen = ref(false)
 watch(active, () => { mobileOpen.value = false })
 const go = (key: string) => { active.value = key }
-const signOut = () => { toast.success('Signed out'); emit('signout') }
+const signOut = async () => {
+  if (!(await confirm({ title: 'Sign out?', message: 'You’ll need to sign in again to access the portal.', confirmLabel: 'Sign out' }))) return
+  toast.success('Signed out'); emit('signout')
+}
 
 const views: Record<string, unknown> = {
   overview: Overview, transactions: PortalTransactions, analytics: PortalAnalytics,

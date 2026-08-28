@@ -8,6 +8,8 @@ import {
 import { INSTITUTION_TYPES, CONNECTION_METHODS, institutionLabel, connectionLabel } from '@/lib/connectivity'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/lib/usePagination'
 import { confirm } from '@/lib/confirm'
 import { toast } from '@/lib/toast'
 
@@ -24,6 +26,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8099'
 const rows = ref<Integration[]>([])
 const loading = ref(true)
 const error = ref('')
+const { page, pageSize, total, pageCount, from, to, paged } = usePagination(rows, 25)
 
 const blankForm = () => ({
   partner_name: '',
@@ -282,7 +285,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <template v-for="r in rows" :key="r.id">
+            <template v-for="r in paged" :key="r.id">
             <tr class="hover:bg-slate-50/60">
               <td class="px-4 py-3">
                 <div class="font-medium text-slate-800">{{ r.partner_name }}</div>
@@ -349,6 +352,9 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
           </tbody>
         </table>
       </div>
+      <Pagination v-if="!loading && rows.length" :page="page" :page-size="pageSize" :total="total"
+        :from="from" :to="to" :page-count="pageCount" noun="institutions"
+        @update:page="page = $event" @update:page-size="pageSize = $event" />
     </SectionCard>
   </div>
 </template>

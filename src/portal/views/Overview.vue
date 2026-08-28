@@ -62,7 +62,8 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
       <template #flush />
       <div v-if="loading" class="p-6 text-sm text-slate-400">Loading…</div>
       <div v-else-if="!recent.length" class="p-10 text-center text-sm text-slate-400">No transactions scored yet. Run one from the Detect tab, or connect your systems.</div>
-      <table v-else class="w-full text-sm">
+      <div v-else class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[640px]">
         <thead>
           <tr class="text-[11px] uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100">
             <th class="text-left px-4 py-2.5 font-semibold">Transaction</th>
@@ -82,6 +83,7 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
           </tr>
         </tbody>
       </table>
+      </div>
     </SectionCard>
   </div>
 </template>

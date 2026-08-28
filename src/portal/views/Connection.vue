@@ -5,6 +5,7 @@ import { CONNECTION_METHODS } from '@/lib/connectivity'
 import type { PortalProfile, FraudResult } from '@/portal/types'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import DecisionBadge from '@/components/ui/DecisionBadge.vue'
+import { toast } from '@/lib/toast'
 
 const props = defineProps<{ profile: PortalProfile }>()
 const emit = defineEmits<{ refresh: [PortalProfile] }>()
@@ -36,8 +37,8 @@ const saveConfig = async () => {
   try {
     const updated = await updateConfig({ webhook_url: webhookDraft.value.trim(), notify_on: eventsDraft.value })
     emit('refresh', { ...props.profile, integration: updated })
-    cfgMsg.value = 'Saved.'; setTimeout(() => (cfgMsg.value = ''), 2500)
-  } catch { cfgMsg.value = 'Save failed.' } finally { savingCfg.value = false }
+    cfgMsg.value = 'Saved.'; toast.success('Connection settings saved'); setTimeout(() => (cfgMsg.value = ''), 2500)
+  } catch { cfgMsg.value = 'Save failed.'; toast.error('Save failed') } finally { savingCfg.value = false }
 }
 
 // Test
@@ -48,7 +49,8 @@ const runTest = async () => {
   testing.value = true; testError.value = ''; testResult.value = null
   try {
     testResult.value = await detect({ transaction_id: `conntest_${inst.value.id}`, user_id: 'portal_test_user', amount: 25000, currency: 'GHS', location: 'Accra, GH', merchant_category: 'crypto', ip_address: '102.89.44.10' })
-  } catch { testError.value = 'Test call failed — check the endpoint is reachable.' } finally { testing.value = false }
+    toast.success(`Connection OK · decision ${testResult.value.decision}`)
+  } catch { testError.value = 'Test call failed — check the endpoint is reachable.'; toast.error('Test call failed') } finally { testing.value = false }
 }
 </script>
 

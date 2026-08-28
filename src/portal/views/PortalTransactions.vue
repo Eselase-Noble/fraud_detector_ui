@@ -4,6 +4,8 @@ import { listTransactions } from '@/portal/api'
 import type { TxnRow } from '@/portal/types'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import DecisionBadge from '@/components/ui/DecisionBadge.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/lib/usePagination'
 
 const FILTERS = ['all', 'BLOCK', 'REVIEW', 'ALLOW'] as const
 const decision = ref<string>('all')
@@ -11,6 +13,7 @@ const search = ref('')
 const rows = ref<TxnRow[]>([])
 const loading = ref(true)
 const expanded = ref<string | null>(null)
+const { page, pageSize, total, pageCount, from, to, paged } = usePagination(rows, 25)
 
 const load = async () => {
   loading.value = true
@@ -48,7 +51,7 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
         </div>
         <input v-model="search" placeholder="Search user or transaction id…"
           class="h-9 flex-1 min-w-[200px] px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
-        <span class="text-xs text-slate-400">{{ rows.length }} shown</span>
+        <span class="text-xs text-slate-400">{{ total }} total</span>
       </div>
     </SectionCard>
 
@@ -56,7 +59,8 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
       <template #flush />
       <div v-if="loading" class="p-6 text-sm text-slate-400">Loading transactions…</div>
       <div v-else-if="!rows.length" class="p-10 text-center text-sm text-slate-400">No transactions match.</div>
-      <table v-else class="w-full text-sm">
+      <div v-else class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[820px]">
         <thead>
           <tr class="text-[11px] uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100">
             <th class="text-left px-4 py-2.5 font-semibold">Transaction</th>
@@ -69,7 +73,7 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
-          <template v-for="r in rows" :key="r.transaction_id">
+          <template v-for="r in paged" :key="r.transaction_id">
             <tr class="hover:bg-slate-50/60 cursor-pointer" @click="expanded = expanded === r.transaction_id ? null : r.transaction_id">
               <td class="px-4 py-2.5 font-mono text-xs text-slate-500 truncate max-w-[140px]">{{ r.transaction_id }}</td>
               <td class="px-4 py-2.5 text-slate-600">{{ r.user_id }}</td>
@@ -91,6 +95,10 @@ const time = (s: string) => { try { return new Date(s).toLocaleString() } catch 
           </template>
         </tbody>
       </table>
+      </div>
+      <Pagination v-if="!loading && rows.length" :page="page" :page-size="pageSize" :total="total"
+        :from="from" :to="to" :page-count="pageCount" noun="transactions"
+        @update:page="page = $event" @update:page-size="pageSize = $event" />
     </SectionCard>
   </div>
 </template>

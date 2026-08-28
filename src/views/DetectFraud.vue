@@ -4,6 +4,7 @@ import { detectFraud } from '@/api/transactions'
 import type { Transaction, FraudResult } from '@/types/fraud'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import DecisionBadge from '@/components/ui/DecisionBadge.vue'
+import { toast } from '@/lib/toast'
 
 defineOptions({ name: 'DetectFraudView' })
 
@@ -36,8 +37,10 @@ const run = async () => {
       timestamp: txn.value.timestamp || new Date().toISOString(),
     }
     result.value = await detectFraud(payload)
+    toast.success(`Scored · ${result.value.decision}`)
   } catch {
     error.value = 'Detection failed — is the Sentinel API reachable?'
+    toast.error('Detection failed — is the Sentinel API reachable?')
   } finally {
     loading.value = false
   }

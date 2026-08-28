@@ -4,6 +4,7 @@ import { detect } from '@/portal/api'
 import type { FraudResult } from '@/portal/types'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import DecisionBadge from '@/components/ui/DecisionBadge.vue'
+import { toast } from '@/lib/toast'
 
 const blank = () => ({
   transaction_id: '', user_id: '', amount: 0, currency: 'GHS',
@@ -24,7 +25,8 @@ const run = async () => {
       ...txn.value,
       transaction_id: txn.value.transaction_id.trim() || `portal_${Math.floor(txn.value.amount)}_${txn.value.user_id.trim()}`,
     })
-  } catch { error.value = 'Detection failed — please try again.' } finally { loading.value = false }
+    toast.success(`Scored · ${result.value.decision}`)
+  } catch { error.value = 'Detection failed — please try again.'; toast.error('Detection failed') } finally { loading.value = false }
 }
 const sample = () => { txn.value = { transaction_id: '', user_id: 'cust_204', amount: 25000, currency: 'GHS', location: 'Lagos, NG', merchant_category: 'crypto', ip_address: '102.89.44.10' } }
 const reset = () => { txn.value = blank(); result.value = null; error.value = '' }

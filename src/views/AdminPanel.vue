@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { getAuditLog, updateUserRisk, type AuditEntry, type RiskTier } from '@/api/admin'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import DecisionBadge from '@/components/ui/DecisionBadge.vue'
+import Pagination from '@/components/ui/Pagination.vue'
+import { usePagination } from '@/lib/usePagination'
 
 defineOptions({ name: 'AdminPanelView' })
 
@@ -12,6 +14,7 @@ const flash = (tone: 'ok' | 'err', msg: string) => { toast.value = { tone, msg }
 /* ── Audit log ── */
 const entries = ref<AuditEntry[]>([])
 const loadingLog = ref(true)
+const { page, pageSize, total, pageCount, from, to, paged } = usePagination(entries, 25)
 const filters = ref({ transaction_id: '', analyst_id: '' })
 const loadLog = async () => {
   loadingLog.value = true
@@ -117,7 +120,7 @@ const when = (s: string) => { try { return new Date(s).toLocaleString() } catch 
 
       <div v-if="loadingLog" class="py-8 text-center text-sm text-slate-400">Loading audit trail…</div>
       <div v-else-if="!entries.length" class="py-10 text-center text-sm text-slate-400">No audit entries match.</div>
-      <table v-else class="w-full text-sm">
+      <div v-else class="overflow-x-auto"><table class="w-full text-sm min-w-[760px]">
         <thead>
           <tr class="text-[11px] uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100">
             <th class="text-left px-3 py-2.5 font-semibold">When</th>
@@ -129,7 +132,7 @@ const when = (s: string) => { try { return new Date(s).toLocaleString() } catch 
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-50">
-          <tr v-for="e in entries" :key="e.id" class="hover:bg-slate-50/60">
+          <tr v-for="e in paged" :key="e.id" class="hover:bg-slate-50/60">
             <td class="px-3 py-2.5 text-xs text-slate-500 whitespace-nowrap">{{ when(e.created_at) }}</td>
             <td class="px-3 py-2.5 font-mono text-xs text-slate-600">{{ e.analyst_id || '—' }}</td>
             <td class="px-3 py-2.5">
@@ -148,6 +151,10 @@ const when = (s: string) => { try { return new Date(s).toLocaleString() } catch 
           </tr>
         </tbody>
       </table>
+      </div>
+      <Pagination v-if="!loadingLog && entries.length" :page="page" :page-size="pageSize" :total="total"
+        :from="from" :to="to" :page-count="pageCount" noun="entries"
+        @update:page="page = $event" @update:page-size="pageSize = $event" />
     </SectionCard>
   </div>
 </template>
