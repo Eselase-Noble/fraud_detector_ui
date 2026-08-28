@@ -5,12 +5,19 @@ import { http } from '@/api/http'
    Types
 ───────────────────────────────────────────── */
 
+export type InstitutionType =
+  | 'bank' | 'fintech' | 'psp' | 'microfinance' | 'mobile_money' | 'sacco' | 'exchange' | 'other'
+export type ConnectionMethod = 'rest_api' | 'batch_api' | 'database' | 'file_sftp'
+
 export interface Integration {
   id: number
   partner_name: string
   webhook_url: string
   is_active: boolean
   notify_on: string[]
+  institution_type: InstitutionType
+  connection_method: ConnectionMethod
+  contact_email: string | null
   created_at: string
   last_used_at: string | null
   api_key?: string
@@ -42,6 +49,9 @@ export const createIntegration = async (payload: {
   partner_name: string
   webhook_url: string
   notify_on: string[]
+  institution_type: InstitutionType
+  connection_method: ConnectionMethod
+  contact_email?: string | null
 }): Promise<Integration> => {
   const { data } = await http.post<Integration>('/admin/integrations', payload)
   return data
@@ -53,6 +63,12 @@ export const toggleIntegration = async (id: number): Promise<void> => {
 
 export const deleteIntegration = async (id: number): Promise<void> => {
   await http.delete(`/admin/integrations/${id}`)
+}
+
+// Rotate a partner's API key — returns the new one-time key on the Integration.
+export const rotateIntegrationKey = async (id: number): Promise<Integration> => {
+  const { data } = await http.post<Integration>(`/admin/integrations/${id}/rotate`)
+  return data
 }
 
 /* ─────────────────────────────────────────────

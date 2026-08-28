@@ -30,6 +30,13 @@ const nav = [
       { to: '/admin', label: 'Admin & Audit', icon: 'shield' },
     ],
   },
+  {
+    label: 'Partners',
+    items: [
+      { to: '/subscribers', label: 'Institutions', icon: 'building' },
+      { to: '/portal', label: 'Partner Portal', icon: 'key' },
+    ],
+  },
 ]
 
 const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.startsWith(to))
@@ -43,6 +50,8 @@ const paths: Record<string, string> = {
   '/analytics': 'Analytics',
   '/users': 'Users & Risk',
   '/upload': 'Knowledge Base',
+  '/subscribers': 'Partner Institutions',
+  '/portal': 'Partner Portal',
   '/admin': 'Admin & Audit',
 }
 

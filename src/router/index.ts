@@ -5,6 +5,8 @@ import DetectFraud  from '@/views/DetectFraud.vue'
 import UploadData   from '@/views/UploadData.vue'
 import Analytics    from '@/views/Analytics.vue'
 import AdminPanel   from '@/views/AdminPanel.vue'
+import Subscribers  from '@/views/Subscribers.vue'
+import PartnerPortal from '@/views/PartnerPortal.vue'
 import Users        from '@/views/Users.vue'
 
 const router = createRouter({
@@ -16,7 +18,9 @@ const router = createRouter({
     { path: '/analytics',    component: Analytics,     meta: { title: 'Analytics' } },
     { path: '/users',        component: Users,         meta: { title: 'Users & Risk' } },
     { path: '/upload',       component: UploadData,    meta: { title: 'Knowledge Base' } },
-    { path: '/admin',        component: AdminPanel,    meta: { title: 'Admin · Operations' } },
+    { path: '/subscribers',  component: Subscribers,   meta: { title: 'Partner Institutions' } },
+    { path: '/portal',       component: PartnerPortal, meta: { title: 'Partner Portal' } },
+    { path: '/admin',        component: AdminPanel,    meta: { title: 'Admin & Audit' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
   scrollBehavior: () => ({ top: 0 }),
