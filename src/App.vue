@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import AppShell from '@/components/AppShell.vue'
+// Root: routes decide which world renders — partner portal at "/", operator
+// console (behind its own staff login) at "/platform".
 </script>
 
 <template>
-  <AppShell />
+  <RouterView />
 </template>
 
 <style>

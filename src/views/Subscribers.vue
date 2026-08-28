@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { RouterLink } from 'vue-router'
 import {
   getIntegrations, createIntegration, toggleIntegration, deleteIntegration, rotateIntegrationKey,
+  setPortalCredentials,
   type Integration, type InstitutionType, type ConnectionMethod,
 } from '@/api/admin'
 import { INSTITUTION_TYPES, CONNECTION_METHODS, institutionLabel, connectionLabel } from '@/lib/connectivity'
@@ -30,7 +30,28 @@ const blankForm = () => ({
   institution_type: 'bank' as InstitutionType,
   connection_method: 'rest_api' as ConnectionMethod,
   contact_email: '',
+  portal_email: '',
+  portal_password: '',
 })
+
+// Per-row portal-login editor (set/reset the human credentials for the portal).
+const credRow = ref<number | null>(null)
+const credForm = ref({ email: '', password: '' })
+const credSaving = ref(false)
+const openCred = (row: Integration) => {
+  credRow.value = row.id
+  credForm.value = { email: row.portal_email || '', password: '' }
+}
+const saveCred = async () => {
+  if (credRow.value == null || !credForm.value.email.trim() || !credForm.value.password) return
+  credSaving.value = true
+  try {
+    await setPortalCredentials(credRow.value, credForm.value.email.trim(), credForm.value.password)
+    credRow.value = null
+    await load()
+  } catch { error.value = 'Could not set the portal login (email may be in use).' }
+  finally { credSaving.value = false }
+}
 const form = ref(blankForm())
 const creating = ref(false)
 const showForm = ref(false)
@@ -66,6 +87,8 @@ const submit = async () => {
       institution_type: form.value.institution_type,
       connection_method: form.value.connection_method,
       contact_email: form.value.contact_email.trim() || null,
+      portal_email: form.value.portal_email.trim() || null,
+      portal_password: form.value.portal_password || null,
     })
     if (created.api_key) issued.value = { id: created.id, name: created.partner_name, key: created.api_key }
     form.value = blankForm()
@@ -99,7 +122,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
         <p class="text-sm text-slate-500 max-w-2xl">Any financial institution — bank, fintech, PSP, microfinance, mobile money or SACCO — that consumes Sentinel. Register one to issue an API key, choose how it sends transaction data, and stream decisions to its webhook.</p>
       </div>
       <div class="flex items-center gap-2">
-        <RouterLink to="/portal" class="h-9 inline-flex items-center px-4 text-sm font-medium rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50">Open partner portal ↗</RouterLink>
+        <a href="/" target="_blank" rel="noopener" class="h-9 inline-flex items-center px-4 text-sm font-medium rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50">Open partner portal ↗</a>
         <button @click="showForm = !showForm"
           class="h-9 px-4 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm">
           {{ showForm ? 'Cancel' : '+ Register institution' }}
@@ -138,7 +161,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
           {{ copied === `${API_BASE}/transactions/detect` ? 'Copied ✓' : 'Copy' }}
         </button>
       </div>
-      <p class="mt-2 text-xs text-slate-400">Header <code class="font-mono text-slate-500">X-API-Key</code> · full connection options (real-time, batch, database, file) are in the <RouterLink to="/portal" class="text-indigo-600 hover:underline">partner portal</RouterLink>.</p>
+      <p class="mt-2 text-xs text-slate-400">Header <code class="font-mono text-slate-500">X-API-Key</code> · full connection options (real-time, batch, database, file) are in the <a href="/" target="_blank" rel="noopener" class="text-indigo-600 hover:underline">partner portal</a>.</p>
     </SectionCard>
 
     <!-- Register form -->
@@ -173,6 +196,23 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
           <input v-model="form.webhook_url" placeholder="https://institution.example/hooks/sentinel"
             class="mt-1 h-9 w-full px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
         </label>
+      </div>
+
+      <!-- Portal login (human credentials for the standalone partner portal) -->
+      <div class="mt-4 rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+        <div class="text-xs font-semibold text-slate-600">Portal login <span class="font-normal text-slate-400">— credentials the institution uses to sign into the partner portal (optional now, can be set later)</span></div>
+        <div class="mt-2 grid gap-4 sm:grid-cols-2">
+          <label class="block">
+            <span class="text-xs font-medium text-slate-500">Login email</span>
+            <input v-model="form.portal_email" type="email" placeholder="admin@institution.example"
+              class="mt-1 h-9 w-full px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-slate-500">Temporary password</span>
+            <input v-model="form.portal_password" type="text" placeholder="share securely; they can change later"
+              class="mt-1 h-9 w-full px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+          </label>
+        </div>
       </div>
       <div class="mt-4">
         <span class="text-xs font-medium text-slate-500">Notify on</span>
@@ -218,10 +258,14 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-50">
-            <tr v-for="r in rows" :key="r.id" class="hover:bg-slate-50/60">
+            <template v-for="r in rows" :key="r.id">
+            <tr class="hover:bg-slate-50/60">
               <td class="px-4 py-3">
                 <div class="font-medium text-slate-800">{{ r.partner_name }}</div>
                 <div class="text-xs text-slate-400">{{ institutionLabel(r.institution_type) }}<span v-if="r.contact_email"> · {{ r.contact_email }}</span></div>
+                <div class="text-2xs mt-0.5" :class="r.portal_email ? 'text-emerald-600' : 'text-amber-600'">
+                  {{ r.portal_email ? `portal login: ${r.portal_email}` : 'no portal login set' }}
+                </div>
               </td>
               <td class="px-4 py-3">
                 <span class="px-2 py-0.5 text-[11px] font-medium rounded bg-slate-100 text-slate-600">{{ connectionLabel(r.connection_method) }}</span>
@@ -249,10 +293,35 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
                 </span>
               </td>
               <td class="px-4 py-3 text-right whitespace-nowrap">
+                <button @click="openCred(r)" class="text-xs font-medium text-indigo-600 hover:text-indigo-700 px-2">{{ r.portal_email ? 'Reset login' : 'Set login' }}</button>
                 <button @click="flip(r)" class="text-xs font-medium text-slate-500 hover:text-slate-800 px-2">{{ r.is_active ? 'Suspend' : 'Activate' }}</button>
                 <button @click="revoke(r)" class="text-xs font-medium text-rose-600 hover:text-rose-700 px-2">Revoke</button>
               </td>
             </tr>
+            <!-- Inline portal-login editor -->
+            <tr v-if="credRow === r.id" class="bg-indigo-50/40">
+              <td colspan="7" class="px-4 py-3">
+                <div class="flex flex-wrap items-end gap-3">
+                  <label class="block">
+                    <span class="text-xs font-medium text-slate-500">Login email</span>
+                    <input v-model="credForm.email" type="email" placeholder="admin@institution.example"
+                      class="mt-1 h-9 w-64 px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                  </label>
+                  <label class="block">
+                    <span class="text-xs font-medium text-slate-500">{{ r.portal_email ? 'New password' : 'Temporary password' }}</span>
+                    <input v-model="credForm.password" type="text" placeholder="share securely"
+                      class="mt-1 h-9 w-64 px-3 text-sm bg-white border border-slate-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none" />
+                  </label>
+                  <button @click="saveCred" :disabled="credSaving || !credForm.email.trim() || !credForm.password"
+                    class="h-9 px-4 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50">
+                    {{ credSaving ? 'Saving…' : 'Save login' }}
+                  </button>
+                  <button @click="credRow = null" class="h-9 px-3 text-sm font-medium rounded-md border border-slate-300 text-slate-600 hover:bg-white">Cancel</button>
+                  <span class="text-xs text-slate-400">Setting a login lets this institution sign into the partner portal at <code class="font-mono">/</code>.</span>
+                </div>
+              </td>
+            </tr>
+            </template>
           </tbody>
         </table>
       </div>

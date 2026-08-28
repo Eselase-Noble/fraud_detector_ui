@@ -18,6 +18,7 @@ export interface Integration {
   institution_type: InstitutionType
   connection_method: ConnectionMethod
   contact_email: string | null
+  portal_email: string | null
   created_at: string
   last_used_at: string | null
   api_key?: string
@@ -52,8 +53,19 @@ export const createIntegration = async (payload: {
   institution_type: InstitutionType
   connection_method: ConnectionMethod
   contact_email?: string | null
+  portal_email?: string | null
+  portal_password?: string | null
 }): Promise<Integration> => {
   const { data } = await http.post<Integration>('/admin/integrations', payload)
+  return data
+}
+
+// Set or reset a partner's portal login (the human email + password used to
+// sign into the standalone partner portal). Distinct from the API key.
+export const setPortalCredentials = async (
+  id: number, portal_email: string, portal_password: string,
+): Promise<Integration> => {
+  const { data } = await http.post<Integration>(`/admin/integrations/${id}/portal_credentials`, { portal_email, portal_password })
   return data
 }
 
