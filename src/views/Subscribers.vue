@@ -9,6 +9,7 @@ import { INSTITUTION_TYPES, CONNECTION_METHODS, institutionLabel, connectionLabe
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
 import { confirm } from '@/lib/confirm'
+import { toast } from '@/lib/toast'
 
 defineOptions({ name: 'PartnersView' })
 
@@ -49,8 +50,9 @@ const saveCred = async () => {
   try {
     await setPortalCredentials(credRow.value, credForm.value.email.trim(), credForm.value.password)
     credRow.value = null
+    toast.success('Portal login set')
     await load()
-  } catch { error.value = 'Could not set the portal login (email may be in use).' }
+  } catch { error.value = 'Could not set the portal login (email may be in use).'; toast.error('Could not set the portal login') }
   finally { credSaving.value = false }
 }
 const form = ref(blankForm())
@@ -94,8 +96,9 @@ const submit = async () => {
     if (created.api_key) issued.value = { id: created.id, name: created.partner_name, key: created.api_key }
     form.value = blankForm()
     showForm.value = false
+    toast.success('Institution registered')
     await load()
-  } catch { error.value = 'Could not register the institution.' }
+  } catch { error.value = 'Could not register the institution.'; toast.error('Could not register the institution') }
   finally { creating.value = false }
 }
 
@@ -105,7 +108,7 @@ const flip = async (row: Integration) => {
     message: 'Their API key and portal logins stop working immediately until reactivated.',
     confirmLabel: 'Suspend', tone: 'danger',
   }))) return
-  await toggleIntegration(row.id).catch(() => {}); await load()
+  await toggleIntegration(row.id).then(() => toast.success(row.is_active ? 'Institution suspended' : 'Institution activated')).catch(() => toast.error('Action failed')); await load()
 }
 const revoke = async (row: Integration) => {
   if (!(await confirm({
@@ -113,7 +116,7 @@ const revoke = async (row: Integration) => {
     message: 'This permanently removes the institution, its API key and all portal users. This cannot be undone.',
     confirmLabel: 'Revoke institution', tone: 'danger',
   }))) return
-  await deleteIntegration(row.id).catch(() => {}); await load()
+  await deleteIntegration(row.id).then(() => toast.success('Institution revoked')).catch(() => toast.error('Revoke failed')); await load()
 }
 const rotate = async (row: Integration) => {
   if (!(await confirm({
@@ -122,7 +125,8 @@ const rotate = async (row: Integration) => {
     confirmLabel: 'Rotate key', tone: 'danger',
   }))) return
   const res = await rotateIntegrationKey(row.id).catch(() => null)
-  if (res?.api_key) issued.value = { id: res.id, name: res.partner_name, key: res.api_key }
+  if (res?.api_key) { issued.value = { id: res.id, name: res.partner_name, key: res.api_key }; toast.success('New API key issued') }
+  else toast.error('Key rotation failed')
   await load()
 }
 
@@ -265,7 +269,7 @@ const when = (s: string | null) => (s ? new Date(s).toLocaleString() : 'never')
         <p class="text-xs text-slate-400 mt-1">Register a partner to issue an API key and start streaming decisions to its webhook.</p>
       </div>
       <div v-else class="overflow-x-auto">
-        <table class="w-full text-sm">
+        <table class="w-full text-sm min-w-[820px]">
           <thead>
             <tr class="text-[11px] uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100">
               <th class="text-left px-4 py-2.5 font-semibold">Institution</th>

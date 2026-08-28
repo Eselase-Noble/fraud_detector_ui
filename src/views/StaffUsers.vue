@@ -4,6 +4,7 @@ import { listStaff, createStaff, updateStaff, deleteStaff, type StaffUserFull } 
 import { staffUser } from '@/platform/auth'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import { confirm } from '@/lib/confirm'
+import { toast } from '@/lib/toast'
 
 const ROLES = ['admin', 'operator', 'viewer'] as const
 const isAdmin = computed(() => staffUser.value?.role === 'admin')
@@ -33,19 +34,21 @@ const add = async () => {
     await createStaff({ email: form.value.email.trim(), name: form.value.name.trim() || undefined, role: form.value.role, password: form.value.password })
     form.value = { email: '', name: '', role: 'operator', password: '' }
     showForm.value = false
+    toast.success('Staff member added')
     await load()
   } catch (e: unknown) {
     error.value = (e as { response?: { status?: number } })?.response?.status === 409 ? 'That email is already in use.' : 'Could not add the user.'
+    toast.error(error.value)
   } finally { saving.value = false }
 }
-const setRole = async (u: StaffUserFull, role: string) => { await updateStaff(u.id, { role }).catch(() => {}); await load() }
+const setRole = async (u: StaffUserFull, role: string) => { await updateStaff(u.id, { role }).then(() => toast.success('Role updated')).catch(() => toast.error('Update failed')); await load() }
 const toggleActive = async (u: StaffUserFull) => {
   if (u.is_active && !(await confirm({
     title: `Disable ${u.name || u.email}?`,
     message: 'They will lose access to the operator console until re-enabled.',
     confirmLabel: 'Disable', tone: 'danger',
   }))) return
-  await updateStaff(u.id, { is_active: !u.is_active }).catch(() => {}); await load()
+  await updateStaff(u.id, { is_active: !u.is_active }).then(() => toast.success(u.is_active ? 'Staff disabled' : 'Staff enabled')).catch(() => toast.error('Update failed')); await load()
 }
 const remove = async (u: StaffUserFull) => {
   if (!(await confirm({
@@ -53,7 +56,7 @@ const remove = async (u: StaffUserFull) => {
     message: 'This permanently deletes their staff account. This cannot be undone.',
     confirmLabel: 'Remove staff', tone: 'danger',
   }))) return
-  await deleteStaff(u.id).catch(() => {}); await load()
+  await deleteStaff(u.id).then(() => toast.success('Staff removed')).catch(() => toast.error('Remove failed')); await load()
 }
 
 const roleTone: Record<string, string> = {
@@ -95,7 +98,8 @@ const roleTone: Record<string, string> = {
       <template #flush />
       <div v-if="error" class="p-4 text-sm text-rose-600">{{ error }}</div>
       <div v-if="loading" class="p-6 text-sm text-slate-400">Loading…</div>
-      <table v-else-if="rows.length" class="w-full text-sm">
+      <div v-else-if="rows.length" class="overflow-x-auto">
+      <table class="w-full text-sm min-w-[520px]">
         <thead>
           <tr class="text-[11px] uppercase tracking-wide text-slate-400 bg-slate-50 border-b border-slate-100">
             <th class="text-left px-4 py-2.5 font-semibold">User</th>
@@ -133,6 +137,7 @@ const roleTone: Record<string, string> = {
           </tr>
         </tbody>
       </table>
+      </div>
     </SectionCard>
   </div>
 </template>

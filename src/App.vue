@@ -2,11 +2,13 @@
 // Root: routes decide which world renders — partner portal at "/", operator
 // console (behind its own staff login) at "/platform".
 import ConfirmHost from '@/components/ConfirmHost.vue'
+import ToastHost from '@/components/ToastHost.vue'
 </script>
 
 <template>
   <RouterView />
   <ConfirmHost />
+  <ToastHost />
 </template>
 
 <style>

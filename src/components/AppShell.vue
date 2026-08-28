@@ -1,11 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { http } from '@/api/http'
 import { staffUser, clearStaffToken } from '@/platform/auth'
+import { toast } from '@/lib/toast'
 
 defineOptions({ name: 'AppShell' })
 const route = useRoute()
+const mobileOpen = ref(false)
+watch(() => route.path, () => { mobileOpen.value = false })
 
 // All console routes live under /platform.
 const nav = [
@@ -47,7 +50,7 @@ const status = ref<'ok' | 'down' | 'checking'>('checking')
 
 const pageTitle = computed(() => (route.meta.title as string)?.replace('Sentinel — ', '') || 'Console')
 
-const signOut = () => { clearStaffToken(); window.location.assign('/platform') }
+const signOut = () => { clearStaffToken(); toast.success('Signed out'); setTimeout(() => window.location.assign('/platform'), 300) }
 
 const checkHealth = async () => {
   try {
@@ -66,8 +69,13 @@ onMounted(() => {
 
 <template>
   <div class="flex min-h-screen bg-slate-50 text-slate-800">
-    <!-- Sidebar -->
-    <aside class="w-60 shrink-0 bg-slate-900 text-slate-300 flex flex-col">
+    <!-- Mobile backdrop -->
+    <div v-if="mobileOpen" class="fixed inset-0 z-30 bg-slate-900/40 lg:hidden" @click="mobileOpen = false" />
+
+    <!-- Sidebar (static on desktop, drawer on mobile) -->
+    <aside
+      class="fixed inset-y-0 left-0 z-40 w-60 shrink-0 bg-slate-900 text-slate-300 flex flex-col transform transition-transform duration-200 lg:static lg:translate-x-0"
+      :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'">
       <div class="h-14 flex items-center gap-2.5 px-4 border-b border-white/5">
         <span class="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-sky-500 text-white font-bold">S</span>
         <div class="leading-tight">
@@ -97,16 +105,19 @@ onMounted(() => {
 
     <!-- Main -->
     <div class="flex-1 flex flex-col min-w-0">
-      <header class="h-14 bg-white border-b border-slate-200 flex items-center px-6 gap-4 shrink-0">
-        <h1 class="text-sm font-semibold text-slate-800">{{ pageTitle }}</h1>
+      <header class="h-14 bg-white border-b border-slate-200 flex items-center px-4 sm:px-6 gap-3 shrink-0">
+        <button @click="mobileOpen = true" class="lg:hidden -ml-1 p-1.5 rounded-md text-slate-500 hover:bg-slate-100" aria-label="Open menu">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <h1 class="text-sm font-semibold text-slate-800 truncate">{{ pageTitle }}</h1>
         <div class="flex-1" />
-        <div class="flex items-center gap-4 text-xs text-slate-500">
+        <div class="flex items-center gap-3 sm:gap-4 text-xs text-slate-500">
           <span class="inline-flex items-center gap-1.5">
             <span class="w-2 h-2 rounded-full" :class="status === 'ok' ? 'bg-emerald-500' : status === 'down' ? 'bg-rose-500' : 'bg-amber-400'" />
-            API {{ status === 'ok' ? 'online' : status === 'down' ? 'offline' : '…' }}
+            <span class="hidden sm:inline">API {{ status === 'ok' ? 'online' : status === 'down' ? 'offline' : '…' }}</span>
           </span>
-          <span class="hidden lg:inline text-slate-400">AI fraud engine · gpt-4.1 + RAG</span>
-          <div class="flex items-center gap-2 pl-3 border-l border-slate-200">
+          <span class="hidden xl:inline text-slate-400">AI fraud engine · gpt-4.1 + RAG</span>
+          <div class="flex items-center gap-2 sm:pl-3 sm:border-l border-slate-200">
             <div class="hidden sm:block text-right leading-tight">
               <div class="text-slate-700 font-medium">{{ staffUser?.name || staffUser?.email || 'Operator' }}</div>
               <div class="text-[10px] uppercase tracking-wide text-slate-400">{{ staffUser?.role || 'staff' }}</div>
@@ -115,7 +126,7 @@ onMounted(() => {
           </div>
         </div>
       </header>
-      <main class="flex-1 overflow-y-auto p-6">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-6">
         <RouterView />
       </main>
     </div>
