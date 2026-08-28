@@ -29,6 +29,7 @@ const nav = [
     label: 'Administration',
     items: [
       { to: '/platform/upload', label: 'Knowledge Base', icon: 'book' },
+      { to: '/platform/staff', label: 'Staff & Access', icon: 'users' },
       { to: '/platform/admin', label: 'Admin & Audit', icon: 'shield' },
     ],
   },

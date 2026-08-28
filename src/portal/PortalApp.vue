@@ -4,7 +4,7 @@ import { token, clearToken } from '@/portal/auth'
 import { getSession } from '@/portal/api'
 import type { PortalProfile } from '@/portal/types'
 import Login from '@/portal/Login.vue'
-import Dashboard from '@/portal/Dashboard.vue'
+import PortalShell from '@/portal/PortalShell.vue'
 
 const profile = ref<PortalProfile | null>(null)
 const booting = ref(true)
@@ -29,6 +29,6 @@ const onSignout = () => { clearToken(); profile.value = null }
       Loading…
     </div>
   </div>
-  <Dashboard v-else-if="profile" :profile="profile" @signout="onSignout" @refresh="onAuthed" />
+  <PortalShell v-else-if="profile" :profile="profile" @signout="onSignout" @refresh="onAuthed" />
   <Login v-else @authed="onAuthed" />
 </template>

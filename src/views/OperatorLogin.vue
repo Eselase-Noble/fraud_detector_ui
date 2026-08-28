@@ -28,17 +28,17 @@ const submit = async () => {
 <template>
   <div class="min-h-screen grid place-items-center bg-slate-900 p-6">
     <div class="w-full max-w-sm">
-      <div class="flex items-center gap-2.5 mb-8">
-        <span class="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-sky-500 text-white font-bold">S</span>
-        <div class="leading-tight">
+      <div class="flex flex-col items-center text-center mb-8">
+        <span class="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-400 to-sky-500 text-white text-lg font-bold">S</span>
+        <div class="mt-3 leading-tight">
           <div class="font-semibold text-white tracking-tight">Sentinel</div>
           <div class="text-[10px] uppercase tracking-[0.16em] text-slate-400">Operator Console</div>
         </div>
       </div>
 
       <div class="rounded-2xl bg-white p-6 shadow-xl">
-        <h2 class="text-lg font-semibold text-slate-900">Staff sign in</h2>
-        <p class="mt-1 text-sm text-slate-500">Operator access only. Partners use the client portal at <a href="/" class="text-indigo-600 hover:underline">/</a>.</p>
+        <h2 class="text-lg font-semibold text-slate-900 text-center">Staff sign in</h2>
+        <p class="mt-1 text-sm text-slate-500 text-center">Operator access only. Partners use the client portal at <a href="/" class="text-indigo-600 hover:underline">/</a>.</p>
 
         <form class="mt-6 space-y-4" @submit.prevent="submit">
           <label class="block">

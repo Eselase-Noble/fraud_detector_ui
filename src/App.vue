@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // Root: routes decide which world renders — partner portal at "/", operator
 // console (behind its own staff login) at "/platform".
+import ConfirmHost from '@/components/ConfirmHost.vue'
 </script>
 
 <template>
   <RouterView />
+  <ConfirmHost />
 </template>
 
 <style>

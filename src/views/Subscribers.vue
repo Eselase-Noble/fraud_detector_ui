@@ -8,6 +8,7 @@ import {
 import { INSTITUTION_TYPES, CONNECTION_METHODS, institutionLabel, connectionLabel } from '@/lib/connectivity'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
+import { confirm } from '@/lib/confirm'
 
 defineOptions({ name: 'PartnersView' })
 
@@ -98,9 +99,28 @@ const submit = async () => {
   finally { creating.value = false }
 }
 
-const flip = async (row: Integration) => { await toggleIntegration(row.id).catch(() => {}); await load() }
-const revoke = async (row: Integration) => { await deleteIntegration(row.id).catch(() => {}); await load() }
+const flip = async (row: Integration) => {
+  if (row.is_active && !(await confirm({
+    title: `Suspend ${row.partner_name}?`,
+    message: 'Their API key and portal logins stop working immediately until reactivated.',
+    confirmLabel: 'Suspend', tone: 'danger',
+  }))) return
+  await toggleIntegration(row.id).catch(() => {}); await load()
+}
+const revoke = async (row: Integration) => {
+  if (!(await confirm({
+    title: `Revoke ${row.partner_name}?`,
+    message: 'This permanently removes the institution, its API key and all portal users. This cannot be undone.',
+    confirmLabel: 'Revoke institution', tone: 'danger',
+  }))) return
+  await deleteIntegration(row.id).catch(() => {}); await load()
+}
 const rotate = async (row: Integration) => {
+  if (!(await confirm({
+    title: `Rotate API key for ${row.partner_name}?`,
+    message: 'A new key is issued and the current one stops working immediately. Update their systems right away.',
+    confirmLabel: 'Rotate key', tone: 'danger',
+  }))) return
   const res = await rotateIntegrationKey(row.id).catch(() => null)
   if (res?.api_key) issued.value = { id: res.id, name: res.partner_name, key: res.api_key }
   await load()

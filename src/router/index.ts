@@ -8,6 +8,7 @@ import UploadData   from '@/views/UploadData.vue'
 import Analytics    from '@/views/Analytics.vue'
 import AdminPanel   from '@/views/AdminPanel.vue'
 import Subscribers  from '@/views/Subscribers.vue'
+import StaffUsers   from '@/views/StaffUsers.vue'
 import Users        from '@/views/Users.vue'
 
 const router = createRouter({
@@ -28,6 +29,7 @@ const router = createRouter({
         { path: 'users',        component: Users,         meta: { title: 'Users & Risk' } },
         { path: 'upload',       component: UploadData,    meta: { title: 'Knowledge Base' } },
         { path: 'subscribers',  component: Subscribers,   meta: { title: 'Partner Institutions' } },
+        { path: 'staff',        component: StaffUsers,    meta: { title: 'Staff & Access' } },
         { path: 'admin',        component: AdminPanel,    meta: { title: 'Admin & Audit' } },
       ],
     },
