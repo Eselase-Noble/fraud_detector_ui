@@ -33,6 +33,7 @@ export interface LearningStatus {
   consumed: number
   learned: number
   skipped: number
+  deduped: number
   stream_length?: number
   pending?: number
   queue_depth?: number

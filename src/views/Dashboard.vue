@@ -331,6 +331,7 @@ const breakdown = computed(() => {
           </div>
           <div v-if="streamStatus" class="mt-3 pt-3 border-t border-slate-100 text-2xs text-slate-400 space-y-0.5">
             <div>consumed {{ streamStatus.consumed.toLocaleString() }} · learned {{ streamStatus.learned.toLocaleString() }}</div>
+            <div>skipped as already-learned: <span class="text-slate-600 font-medium">{{ (streamStatus.deduped ?? 0).toLocaleString() }}</span></div>
             <div v-if="streamStatus.pending !== undefined">backlog {{ streamStatus.pending }} pending</div>
           </div>
         </div>
