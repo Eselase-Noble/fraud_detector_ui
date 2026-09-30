@@ -8,13 +8,22 @@ export interface LearningMetrics {
   accuracy: number | null
   precision: number | null
   recall: number | null
+  specificity: number | null
   f1: number | null
+  balanced_accuracy: number | null
+  mcc: number | null
+  auc: number | null
   avg_loss: number | null
   fraud_labels: number
+  fraud_rate: number | null
+  confusion: { tp: number; fp: number; fn: number; tn: number }
+  predicted_positive: number
+  notes: string[]
 }
 
 export interface CurvePoint { bucket: number; n: number; accuracy: number | null }
 export interface SourceCount { source: string; count: number }
+export interface FxRate { rate: number; source: string | null; as_of: string | null; base: string; quote: string }
 
 export interface LearningStatus {
   broker: string
@@ -27,6 +36,7 @@ export interface LearningStatus {
   stream_length?: number
   pending?: number
   queue_depth?: number
+  fx?: FxRate | null
 }
 
 export interface LearningMetricsResponse {
@@ -37,7 +47,10 @@ export interface LearningMetricsResponse {
     n_updates: number
     influence: number
     is_trusted: boolean
+    weights: Record<string, number>
+    bias: number
   }
+  fx: FxRate | null
 }
 
 // Shared prequential window so every view reports the SAME accuracy/precision/recall.

@@ -127,7 +127,6 @@ onMounted(() => {
             <span class="w-2 h-2 rounded-full" :class="status === 'ok' ? 'bg-emerald-500' : status === 'down' ? 'bg-rose-500' : 'bg-amber-400'" />
             <span class="hidden sm:inline">API {{ status === 'ok' ? 'online' : status === 'down' ? 'offline' : '…' }}</span>
           </span>
-          <span class="hidden xl:inline text-slate-400">AI fraud engine · gpt-4.1 + RAG</span>
           <div class="flex items-center gap-2 sm:pl-3 sm:border-l border-slate-200">
             <div class="hidden sm:block text-right leading-tight">
               <div class="text-slate-700 font-medium">{{ staffUser?.name || staffUser?.email || 'Operator' }}</div>

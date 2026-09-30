@@ -5,6 +5,7 @@ import { getModelStats, type ModelStats } from '@/api/transactions'
 import { getLearningMetrics, getLearningStatus, type LearningMetricsResponse, type LearningStatus } from '@/api/learning'
 import { useAutoRefresh } from '@/composables/useAutoRefresh'
 import LiveBadge from '@/components/LiveBadge.vue'
+import LineChart from '@/components/LineChart.vue'
 import type { FraudStats, TopUser, LocationRisk, SignalFrequency } from '@/types/fraud'
 
 defineOptions({ name: 'DashboardView' })
@@ -25,17 +26,18 @@ const fmtPct = (n: number | null | undefined) => (n === null || n === undefined 
 // ─── Real-time training feed (SSE) ───────────────────────────────────────────
 interface LiveStep {
   n: number; source: string; subject: string | null
-  amount: number | null; merchant_category: string | null; location: string | null
+  amount: number | null; currency?: string | null; merchant_category: string | null; location: string | null
   label: number; predicted_proba: number; predicted_label: number
   correct: boolean; influence: number; rolling_accuracy: number | null
 }
-const liveMoney = (n: number | null) => (n === null || n === undefined ? '—' : `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+const liveMoney = (n: number | null, c = 'GHS') => (n === null || n === undefined ? '—' : `${c} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
 const liveConnected = ref(false)
 const liveSteps = ref<LiveStep[]>([])
 const liveCount = ref(0)
 const liveRollingAcc = ref<number | null>(null)
 const liveFraudSeen = ref(0)
 const liveAccSpark = ref<number[]>([])
+const liveSeeded = ref(false)
 let es: EventSource | null = null
 
 const openLiveStream = () => {
@@ -95,6 +97,14 @@ const load = async () => {
     model.value = m
     learning.value = lm
     streamStatus.value = ls
+    // Seed the live feed's chart/counters from server history so the view
+    // reflects the ONGOING stream on open (training never stopped server-side).
+    if (!liveSeeded.value && lm) {
+      if (lm.curve.length) liveAccSpark.value = lm.curve.map((c) => c.accuracy ?? 0)
+      liveCount.value = lm.metrics.total_events
+      liveFraudSeen.value = lm.metrics.fraud_labels
+      liveSeeded.value = true
+    }
   } finally {
     loading.value = false
   }
@@ -150,12 +160,17 @@ const breakdown = computed(() => {
         </div>
       </div>
 
-      <!-- live rolling-accuracy sparkline -->
-      <div class="flex items-end gap-px h-10 mb-3">
-        <div v-for="(a, i) in liveAccSpark" :key="i" class="flex-1 rounded-t"
-          :class="a >= 0.9 ? 'bg-emerald-500' : a >= 0.7 ? 'bg-amber-500' : 'bg-rose-500'"
-          :style="{ height: `${Math.max(4, a * 100)}%` }" />
-        <div v-if="!liveAccSpark.length" class="text-2xs text-slate-500 self-center">waiting for the stream to flow…</div>
+      <!-- FX conversion provenance -->
+      <div v-if="learning?.fx" class="text-2xs text-slate-500 mb-2 flex flex-wrap items-center gap-x-1.5">
+        <span class="text-emerald-400">💱 GHS</span>
+        <span>· 1 {{ learning.fx.base }} = <span class="text-slate-300 font-semibold">{{ learning.fx.rate }}</span> {{ learning.fx.quote }}</span>
+        <span>· {{ (learning.fx.source || '').replace(/^https?:\/\//, '') }}</span>
+        <span v-if="learning.fx.as_of">· as of {{ learning.fx.as_of }}</span>
+      </div>
+
+      <!-- live rolling-accuracy line graph -->
+      <div class="mb-3">
+        <LineChart :values="liveAccSpark" :min="0" :max="1" :height="56" stroke="#34d399" fill="rgba(52,211,153,0.14)" />
       </div>
 
       <!-- scrolling event rows -->
@@ -164,7 +179,7 @@ const breakdown = computed(() => {
           :class="s.label === 1 ? 'bg-rose-500/5' : ''">
           <span class="text-slate-500 w-10 tabular-nums shrink-0">{{ s.n }}</span>
           <span class="w-24 truncate shrink-0" :class="s.source === 'public_dataset' ? 'text-sky-400' : 'text-fuchsia-400'">{{ s.source }}</span>
-          <span class="w-20 shrink-0 text-right tabular-nums text-slate-200">{{ liveMoney(s.amount) }}</span>
+          <span class="w-24 shrink-0 text-right tabular-nums text-slate-200">{{ liveMoney(s.amount, s.currency || 'GHS') }}</span>
           <span class="text-slate-400 w-24 truncate shrink-0">{{ s.location || '—' }}</span>
           <span class="text-slate-400 w-20 truncate shrink-0">{{ s.merchant_category || '—' }}</span>
           <span class="w-14 shrink-0 font-semibold" :class="s.label === 1 ? 'text-rose-400' : 'text-slate-500'">{{ s.label === 1 ? 'FRAUD' : 'legit' }}</span>
