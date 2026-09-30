@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from 'vue'
 import { getFraudStats, getTopUsers, getLocationRisk, getSignalFrequency } from '@/api/analytics'
+import { getModelStats, type ModelStats } from '@/api/transactions'
 import type { FraudStats, TopUser, LocationRisk, SignalFrequency } from '@/types/fraud'
 
 defineOptions({ name: 'DashboardView' })
@@ -11,6 +12,19 @@ const stats = ref<FraudStats | null>(null)
 const users = ref<TopUser[]>([])
 const locations = ref<LocationRisk[]>([])
 const signals = ref<SignalFrequency[]>([])
+const model = ref<ModelStats | null>(null)
+
+// Feature weights sorted by absolute magnitude — the signals the model leans on most.
+const topWeights = computed(() => {
+  const w = model.value?.weights ?? {}
+  return Object.entries(w)
+    .filter(([, v]) => Math.abs(v) > 1e-6)
+    .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+    .slice(0, 6)
+})
+const maxWeight = computed(() => Math.max(1e-6, ...topWeights.value.map(([, v]) => Math.abs(v))))
+const prettyFeature = (k: string) =>
+  k.replace(/_/g, ' ').replace(/\bgt\b/, '>').replace(/\b\w/g, (c) => c.toUpperCase())
 
 const money = (n = 0) => `GHS ${Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const pct = (n = 0) => `${(Number(n) * (Number(n) <= 1 ? 100 : 1)).toFixed(1)}%`
@@ -18,16 +32,18 @@ const pct = (n = 0) => `${(Number(n) * (Number(n) <= 1 ? 100 : 1)).toFixed(1)}%`
 const load = async () => {
   loading.value = true
   try {
-    const [s, u, l, sig] = await Promise.all([
+    const [s, u, l, sig, m] = await Promise.all([
       getFraudStats(days.value).catch(() => null),
       getTopUsers(8, days.value).catch(() => []),
       getLocationRisk(days.value).catch(() => []),
       getSignalFrequency(days.value).catch(() => []),
+      getModelStats().catch(() => null),
     ])
     stats.value = s
     users.value = u
     locations.value = l
     signals.value = sig
+    model.value = m
   } finally {
     loading.value = false
   }

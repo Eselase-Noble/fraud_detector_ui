@@ -26,3 +26,21 @@ export const getTransactionById = async (id: string): Promise<Transaction> => {
   const res = await http.get(`/transactions/${id}`)
   return res.data
 }
+
+export interface ModelStats {
+  name: string
+  n_updates: number
+  n_fraud_labels: number
+  n_legit_labels: number
+  influence: number
+  is_trusted: boolean
+  min_samples_to_trust: number
+  weights: Record<string, number>
+  bias: number
+}
+
+// Online-learning model: what it has learned so far from analyst feedback.
+export const getModelStats = async (): Promise<ModelStats> => {
+  const res = await http.get('/transactions/model/stats')
+  return res.data
+}
