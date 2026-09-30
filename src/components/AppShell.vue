@@ -12,10 +12,13 @@ const mobileOpen = ref(false)
 watch(() => route.path, () => { mobileOpen.value = false })
 
 // All console routes live under /platform.
-const nav = [
+const nav: { label: string; items: { to: string; label: string; icon: string; live?: boolean }[] }[] = [
   {
     label: 'Overview',
-    items: [{ to: '/platform', label: 'Dashboard', icon: 'grid' }],
+    items: [
+      { to: '/platform', label: 'Dashboard', icon: 'grid' },
+      { to: '/platform/live', label: 'Live Training', icon: 'pulse', live: true },
+    ],
   },
   {
     label: 'Detection',
@@ -97,7 +100,11 @@ onMounted(() => {
                 class="group flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors"
                 :class="isActive(item.to) ? 'bg-indigo-500/15 text-white ring-1 ring-inset ring-indigo-400/30' : 'text-slate-400 hover:bg-white/5 hover:text-slate-100'"
               >
-                <span class="w-1.5 h-1.5 rounded-full" :class="isActive(item.to) ? 'bg-indigo-300' : 'bg-slate-600'" />
+                <span v-if="item.live" class="relative flex h-1.5 w-1.5">
+                  <span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75 animate-ping" />
+                  <span class="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400" />
+                </span>
+                <span v-else class="w-1.5 h-1.5 rounded-full" :class="isActive(item.to) ? 'bg-indigo-300' : 'bg-slate-600'" />
                 {{ item.label }}
               </RouterLink>
             </li>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { getFraudStats, getTimeSeries, getTopUsers, getLocationRisk, getSignalFrequency } from '@/api/analytics'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import LiveBadge from '@/components/LiveBadge.vue'
 import type { FraudStats, TimeSeries, TopUser, LocationRisk, SignalFrequency } from '@/types/fraud'
 import SectionCard from '@/components/ui/SectionCard.vue'
 import StatCard from '@/components/ui/StatCard.vue'
@@ -19,7 +21,8 @@ const locations = ref<LocationRisk[]>([])
 const signals = ref<SignalFrequency[]>([])
 
 const load = async () => {
-  loading.value = true; error.value = ''
+  if (!stats.value) loading.value = true   // skeleton only on first load
+  error.value = ''
   try {
     const [s, ts, tu, lr, sf] = await Promise.all([
       getFraudStats(days.value).catch(() => null),
@@ -32,7 +35,7 @@ const load = async () => {
     if (!s && !ts.length) error.value = 'No analytics available yet — run some detections first.'
   } catch { error.value = 'Could not load analytics.' } finally { loading.value = false }
 }
-onMounted(load)
+const { lastUpdated } = useAutoRefresh(load, 7000)
 const setRange = (d: number) => { days.value = d; load() }
 
 const pct = (n = 0) => `${(n * 100).toFixed(1)}%`
@@ -48,7 +51,10 @@ const shortDate = (s: string) => { try { return new Date(s).toLocaleDateString(u
   <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h2 class="text-lg font-semibold text-slate-900">Analytics</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="text-lg font-semibold text-slate-900">Analytics</h2>
+          <LiveBadge :last-updated="lastUpdated" />
+        </div>
         <p class="text-sm text-slate-500">Fraud trends, risk concentration and the signals driving decisions.</p>
       </div>
       <div class="inline-flex rounded-md border border-slate-200 bg-white p-0.5">

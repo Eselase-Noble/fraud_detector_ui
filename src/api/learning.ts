@@ -40,7 +40,10 @@ export interface LearningMetricsResponse {
   }
 }
 
-export const getLearningMetrics = async (window = 1000, buckets = 20): Promise<LearningMetricsResponse> => {
+// Shared prequential window so every view reports the SAME accuracy/precision/recall.
+export const LEARNING_WINDOW = 2000
+
+export const getLearningMetrics = async (window = LEARNING_WINDOW, buckets = 20): Promise<LearningMetricsResponse> => {
   const res = await http.get('/learning/metrics', { params: { window, buckets } })
   return res.data
 }

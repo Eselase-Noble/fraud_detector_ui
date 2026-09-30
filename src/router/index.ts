@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import PortalApp    from '@/portal/PortalApp.vue'
 import PlatformGate from '@/views/PlatformGate.vue'
 import Dashboard    from '@/views/Dashboard.vue'
+import LearningLive  from '@/views/LearningLive.vue'
 import Transactions from '@/views/Transactions.vue'
 import DetectFraud  from '@/views/DetectFraud.vue'
 import UploadData   from '@/views/UploadData.vue'
@@ -23,6 +24,7 @@ const router = createRouter({
       component: PlatformGate,
       children: [
         { path: '',             component: Dashboard,    meta: { title: 'Sentinel — Console' } },
+        { path: 'live',         component: LearningLive, meta: { title: 'Live Training' } },
         { path: 'transactions', component: Transactions, meta: { title: 'Transactions' } },
         { path: 'detect',       component: DetectFraud,  meta: { title: 'Detect Fraud' } },
         { path: 'analytics',    component: Analytics,     meta: { title: 'Analytics' } },

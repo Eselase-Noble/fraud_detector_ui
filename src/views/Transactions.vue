@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { getAllTransactions, detectFraud } from '@/api/transactions'
 import type { Transaction, FraudResult } from '@/types/fraud'
 import Pagination from '@/components/ui/Pagination.vue'
 import { usePagination } from '@/lib/usePagination'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import LiveBadge from '@/components/LiveBadge.vue'
 
 defineOptions({ name: 'TransactionsView' })
 
@@ -24,7 +26,7 @@ const decTone: Record<string, string> = {
 }
 
 const load = async () => {
-  loading.value = true
+  if (!rows.value.length) loading.value = true   // skeleton only on first load
   try {
     rows.value = await getAllTransactions({
       limit: 500,
@@ -37,7 +39,8 @@ const load = async () => {
     loading.value = false
   }
 }
-onMounted(load)
+// Live: keep the ledger current without manual refresh.
+const { lastUpdated } = useAutoRefresh(load, 6000)
 
 const openRow = async (t: Transaction) => {
   selected.value = t
@@ -56,7 +59,10 @@ const openRow = async (t: Transaction) => {
 <template>
   <div class="space-y-4">
     <div>
-      <h2 class="text-lg font-semibold text-slate-900">Transactions</h2>
+      <div class="flex items-center gap-3">
+        <h2 class="text-lg font-semibold text-slate-900">Transactions</h2>
+        <LiveBadge :last-updated="lastUpdated" />
+      </div>
       <p class="text-sm text-slate-500">Every transaction assessed by Sentinel. Filter by verdict or user, click a row to re-assess.</p>
     </div>
 

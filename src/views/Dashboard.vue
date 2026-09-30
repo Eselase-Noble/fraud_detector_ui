@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onMounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref, computed } from 'vue'
 import { getFraudStats, getTopUsers, getLocationRisk, getSignalFrequency } from '@/api/analytics'
 import { getModelStats, type ModelStats } from '@/api/transactions'
 import { getLearningMetrics, getLearningStatus, type LearningMetricsResponse, type LearningStatus } from '@/api/learning'
+import { useAutoRefresh } from '@/composables/useAutoRefresh'
+import LiveBadge from '@/components/LiveBadge.vue'
 import type { FraudStats, TopUser, LocationRisk, SignalFrequency } from '@/types/fraud'
 
 defineOptions({ name: 'DashboardView' })
@@ -20,6 +22,45 @@ const streamStatus = ref<LearningStatus | null>(null)
 const curveMax = computed(() => 1) // accuracy is already 0..1
 const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${(n * 100).toFixed(1)}%`)
 
+// ─── Real-time training feed (SSE) ───────────────────────────────────────────
+interface LiveStep {
+  n: number; source: string; subject: string | null
+  amount: number | null; merchant_category: string | null; location: string | null
+  label: number; predicted_proba: number; predicted_label: number
+  correct: boolean; influence: number; rolling_accuracy: number | null
+}
+const liveMoney = (n: number | null) => (n === null || n === undefined ? '—' : `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+const liveConnected = ref(false)
+const liveSteps = ref<LiveStep[]>([])
+const liveCount = ref(0)
+const liveRollingAcc = ref<number | null>(null)
+const liveFraudSeen = ref(0)
+const liveAccSpark = ref<number[]>([])
+let es: EventSource | null = null
+
+const openLiveStream = () => {
+  const base = import.meta.env.VITE_API_BASE_URL || ''
+  es = new EventSource(`${base}/learning/live`)
+  es.onopen = () => { liveConnected.value = true }
+  es.onerror = () => { liveConnected.value = false }
+  es.onmessage = (ev) => {
+    let d: LiveStep & { type?: string }
+    try { d = JSON.parse(ev.data) } catch { return }
+    if (d.type && d.type !== 'step') return           // ignore hello/keepalive
+    liveCount.value = d.n
+    liveRollingAcc.value = d.rolling_accuracy
+    if (d.label === 1) liveFraudSeen.value++
+    liveSteps.value.unshift(d)
+    if (liveSteps.value.length > 18) liveSteps.value.pop()
+    if (d.rolling_accuracy !== null) {
+      liveAccSpark.value.push(d.rolling_accuracy)
+      if (liveAccSpark.value.length > 60) liveAccSpark.value.shift()
+    }
+  }
+}
+onMounted(openLiveStream)
+onUnmounted(() => { es?.close() })
+
 // Feature weights sorted by absolute magnitude — the signals the model leans on most.
 const topWeights = computed(() => {
   const w = model.value?.weights ?? {}
@@ -36,7 +77,7 @@ const money = (n = 0) => `GHS ${Number(n).toLocaleString(undefined, { minimumFra
 const pct = (n = 0) => `${(Number(n) * (Number(n) <= 1 ? 100 : 1)).toFixed(1)}%`
 
 const load = async () => {
-  loading.value = true
+  if (!stats.value) loading.value = true   // skeleton only on first load
   try {
     const [s, u, l, sig, m, lm, ls] = await Promise.all([
       getFraudStats(days.value).catch(() => null),
@@ -44,7 +85,7 @@ const load = async () => {
       getLocationRisk(days.value).catch(() => []),
       getSignalFrequency(days.value).catch(() => []),
       getModelStats().catch(() => null),
-      getLearningMetrics(1000, 20).catch(() => null),
+      getLearningMetrics().catch(() => null),
       getLearningStatus().catch(() => null),
     ])
     stats.value = s
@@ -58,7 +99,8 @@ const load = async () => {
     loading.value = false
   }
 }
-onMounted(load)
+// Live: refresh dashboard data every 5s (pauses when the tab is hidden).
+const { lastUpdated } = useAutoRefresh(load, 5000)
 
 const total = computed(() => stats.value?.total_transactions ?? 0)
 const breakdown = computed(() => {
@@ -76,7 +118,10 @@ const breakdown = computed(() => {
   <div class="space-y-5">
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-lg font-semibold text-slate-900">Fraud overview</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="text-lg font-semibold text-slate-900">Fraud overview</h2>
+          <LiveBadge :last-updated="lastUpdated" />
+        </div>
         <p class="text-sm text-slate-500">Organization-wide detection activity over the selected window.</p>
       </div>
       <select v-model.number="days" @change="load" class="h-9 px-3 text-sm bg-white border border-slate-300 rounded-md">
@@ -85,6 +130,50 @@ const breakdown = computed(() => {
         <option :value="90">Last 90 days</option>
         <option :value="365">Last year</option>
       </select>
+    </div>
+
+    <!-- Real-time training feed -->
+    <div class="rounded-xl bg-slate-900 text-slate-100 border border-slate-800 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium">Live training feed</span>
+          <span class="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded inline-flex items-center gap-1"
+            :class="liveConnected ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-700 text-slate-400'">
+            <span class="w-1.5 h-1.5 rounded-full" :class="liveConnected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'" />
+            {{ liveConnected ? 'Streaming' : 'Connecting…' }}
+          </span>
+        </div>
+        <div class="flex items-center gap-4 text-xs">
+          <span class="text-slate-400">learned <span class="text-slate-100 font-semibold tabular-nums">{{ liveCount.toLocaleString() }}</span></span>
+          <span class="text-slate-400">fraud seen <span class="text-rose-400 font-semibold tabular-nums">{{ liveFraudSeen }}</span></span>
+          <span class="text-slate-400">rolling acc <span class="text-emerald-400 font-semibold tabular-nums">{{ fmtPct(liveRollingAcc) }}</span></span>
+        </div>
+      </div>
+
+      <!-- live rolling-accuracy sparkline -->
+      <div class="flex items-end gap-px h-10 mb-3">
+        <div v-for="(a, i) in liveAccSpark" :key="i" class="flex-1 rounded-t"
+          :class="a >= 0.9 ? 'bg-emerald-500' : a >= 0.7 ? 'bg-amber-500' : 'bg-rose-500'"
+          :style="{ height: `${Math.max(4, a * 100)}%` }" />
+        <div v-if="!liveAccSpark.length" class="text-2xs text-slate-500 self-center">waiting for the stream to flow…</div>
+      </div>
+
+      <!-- scrolling event rows -->
+      <div class="font-mono text-2xs space-y-0.5 max-h-56 overflow-hidden">
+        <div v-for="s in liveSteps" :key="s.n" class="flex items-center gap-2 py-0.5 border-b border-slate-800/50"
+          :class="s.label === 1 ? 'bg-rose-500/5' : ''">
+          <span class="text-slate-500 w-10 tabular-nums shrink-0">{{ s.n }}</span>
+          <span class="w-24 truncate shrink-0" :class="s.source === 'public_dataset' ? 'text-sky-400' : 'text-fuchsia-400'">{{ s.source }}</span>
+          <span class="w-20 shrink-0 text-right tabular-nums text-slate-200">{{ liveMoney(s.amount) }}</span>
+          <span class="text-slate-400 w-24 truncate shrink-0">{{ s.location || '—' }}</span>
+          <span class="text-slate-400 w-20 truncate shrink-0">{{ s.merchant_category || '—' }}</span>
+          <span class="w-14 shrink-0 font-semibold" :class="s.label === 1 ? 'text-rose-400' : 'text-slate-500'">{{ s.label === 1 ? 'FRAUD' : 'legit' }}</span>
+          <span class="text-slate-500 shrink-0">p={{ s.predicted_proba.toFixed(2) }}</span>
+          <span class="shrink-0" :class="s.correct ? 'text-emerald-400' : 'text-rose-400'">{{ s.correct ? '✓' : '✗ miss' }}</span>
+        </div>
+        <div v-if="!liveSteps.length" class="text-slate-500 py-2">No events yet. Start a producer (e.g. stream_public_dataset.py) or submit feedback to see steps appear here.</div>
+      </div>
+      <p class="text-2xs text-slate-500 mt-2">Each row is one online-learning step as it happens — prediction made <em>before</em> training (prequential). Identities are already pseudonymized.</p>
     </div>
 
     <!-- KPI cards -->
