@@ -2,6 +2,7 @@
 import { onMounted, ref, computed } from 'vue'
 import { getFraudStats, getTopUsers, getLocationRisk, getSignalFrequency } from '@/api/analytics'
 import { getModelStats, type ModelStats } from '@/api/transactions'
+import { getLearningMetrics, getLearningStatus, type LearningMetricsResponse, type LearningStatus } from '@/api/learning'
 import type { FraudStats, TopUser, LocationRisk, SignalFrequency } from '@/types/fraud'
 
 defineOptions({ name: 'DashboardView' })
@@ -13,6 +14,11 @@ const users = ref<TopUser[]>([])
 const locations = ref<LocationRisk[]>([])
 const signals = ref<SignalFrequency[]>([])
 const model = ref<ModelStats | null>(null)
+const learning = ref<LearningMetricsResponse | null>(null)
+const streamStatus = ref<LearningStatus | null>(null)
+
+const curveMax = computed(() => 1) // accuracy is already 0..1
+const fmtPct = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${(n * 100).toFixed(1)}%`)
 
 // Feature weights sorted by absolute magnitude — the signals the model leans on most.
 const topWeights = computed(() => {
@@ -32,18 +38,22 @@ const pct = (n = 0) => `${(Number(n) * (Number(n) <= 1 ? 100 : 1)).toFixed(1)}%`
 const load = async () => {
   loading.value = true
   try {
-    const [s, u, l, sig, m] = await Promise.all([
+    const [s, u, l, sig, m, lm, ls] = await Promise.all([
       getFraudStats(days.value).catch(() => null),
       getTopUsers(8, days.value).catch(() => []),
       getLocationRisk(days.value).catch(() => []),
       getSignalFrequency(days.value).catch(() => []),
       getModelStats().catch(() => null),
+      getLearningMetrics(1000, 20).catch(() => null),
+      getLearningStatus().catch(() => null),
     ])
     stats.value = s
     users.value = u
     locations.value = l
     signals.value = sig
     model.value = m
+    learning.value = lm
+    streamStatus.value = ls
   } finally {
     loading.value = false
   }
@@ -149,6 +159,78 @@ const breakdown = computed(() => {
       <p class="text-2xs text-slate-400 mt-3">
         Positive weight (red) pushes toward fraud, negative (green) toward legitimate. Updated live as analysts review cases.
       </p>
+    </div>
+
+    <!-- Learning stream (online-learning pipeline observability) -->
+    <div v-if="learning" class="rounded-xl bg-white border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-slate-700">Learning stream</span>
+          <span v-if="streamStatus" class="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded inline-flex items-center gap-1"
+            :class="streamStatus.consumer_running ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'">
+            <span class="w-1.5 h-1.5 rounded-full" :class="streamStatus.consumer_running ? 'bg-emerald-500' : 'bg-rose-500'" />
+            {{ streamStatus.consumer_running ? 'Consumer live' : 'Stopped' }}
+          </span>
+          <span v-if="streamStatus" class="text-2xs text-slate-400">via {{ streamStatus.broker }}</span>
+        </div>
+        <span v-if="streamStatus" class="text-2xs text-slate-400" :title="'Active PII key: ' + streamStatus.pepper_fingerprint">
+          🔒 identities pseudonymized · key {{ streamStatus.pepper_fingerprint }}
+        </span>
+      </div>
+
+      <!-- Prequential metric tiles -->
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Events learned</div>
+          <div class="text-2xl font-semibold text-slate-900 mt-1">{{ learning.metrics.total_events.toLocaleString() }}</div>
+          <div class="text-xs text-slate-400 mt-0.5">{{ learning.metrics.fraud_labels }} fraud in window</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Accuracy</div>
+          <div class="text-2xl font-semibold text-emerald-600 mt-1">{{ fmtPct(learning.metrics.accuracy) }}</div>
+          <div class="text-xs text-slate-400 mt-0.5">prequential</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Precision</div>
+          <div class="text-2xl font-semibold text-slate-900 mt-1">{{ fmtPct(learning.metrics.precision) }}</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Recall</div>
+          <div class="text-2xl font-semibold text-slate-900 mt-1">{{ fmtPct(learning.metrics.recall) }}</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Avg loss</div>
+          <div class="text-2xl font-semibold text-slate-900 mt-1">{{ learning.metrics.avg_loss ?? '—' }}</div>
+        </div>
+      </div>
+
+      <!-- Learning curve + sources -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+        <div class="lg:col-span-2">
+          <div class="text-2xs uppercase tracking-wide text-slate-400 mb-2">Learning curve — rolling accuracy (oldest → newest)</div>
+          <div v-if="learning.curve.length" class="flex items-end gap-1 h-24">
+            <div v-for="c in learning.curve" :key="c.bucket" class="flex-1 bg-indigo-100 rounded-t relative group"
+              :style="{ height: `${((c.accuracy ?? 0) / curveMax) * 100}%` }" :title="`bucket ${c.bucket}: ${fmtPct(c.accuracy)} (${c.n})`">
+              <div class="absolute inset-x-0 bottom-0 bg-indigo-500 rounded-t" :style="{ height: '100%' }" />
+            </div>
+          </div>
+          <div v-else class="text-xs text-slate-400">No learning events yet.</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400 mb-2">Feedback sources</div>
+          <div class="space-y-2">
+            <div v-for="s in learning.by_source" :key="s.source" class="flex items-center justify-between text-xs">
+              <span class="text-slate-600">{{ s.source.replace(/_/g, ' ') }}</span>
+              <span class="font-semibold text-slate-700 tabular-nums">{{ s.count.toLocaleString() }}</span>
+            </div>
+            <div v-if="!learning.by_source.length" class="text-xs text-slate-400">No sources yet.</div>
+          </div>
+          <div v-if="streamStatus" class="mt-3 pt-3 border-t border-slate-100 text-2xs text-slate-400 space-y-0.5">
+            <div>consumed {{ streamStatus.consumed.toLocaleString() }} · learned {{ streamStatus.learned.toLocaleString() }}</div>
+            <div v-if="streamStatus.pending !== undefined">backlog {{ streamStatus.pending }} pending</div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Decision breakdown -->
