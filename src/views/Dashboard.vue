@@ -100,6 +100,57 @@ const breakdown = computed(() => {
       </div>
     </div>
 
+    <!-- Model learning (online-learning model) -->
+    <div v-if="model" class="rounded-xl bg-white border border-slate-200 p-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-medium text-slate-700">Model learning</span>
+          <span class="text-2xs uppercase tracking-wide px-1.5 py-0.5 rounded"
+            :class="model.is_trusted ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'">
+            {{ model.is_trusted ? 'Active' : 'Warming up' }}
+          </span>
+        </div>
+        <span class="text-2xs text-slate-400">learns from analyst feedback</span>
+      </div>
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Labels learned</div>
+          <div class="text-2xl font-semibold text-slate-900 mt-1">{{ model.n_updates.toLocaleString() }}</div>
+          <div class="text-xs text-slate-400 mt-0.5">{{ model.n_fraud_labels }} fraud · {{ model.n_legit_labels }} legit</div>
+        </div>
+        <div>
+          <div class="text-2xs uppercase tracking-wide text-slate-400">Score influence</div>
+          <div class="text-2xl font-semibold text-indigo-600 mt-1">{{ Math.round(model.influence * 100) }}%</div>
+          <div class="text-xs text-slate-400 mt-0.5">share of the blended score</div>
+        </div>
+        <div class="col-span-2 lg:col-span-2">
+          <div class="text-2xs uppercase tracking-wide text-slate-400 mb-2">
+            Top learned signals
+            <span v-if="!model.is_trusted" class="normal-case tracking-normal text-slate-300">
+              — needs {{ model.min_samples_to_trust }} labels to activate
+            </span>
+          </div>
+          <div v-if="topWeights.length" class="space-y-1.5">
+            <div v-for="[name, w] in topWeights" :key="name" class="flex items-center gap-2">
+              <span class="text-xs text-slate-600 w-32 shrink-0 truncate" :title="prettyFeature(name)">{{ prettyFeature(name) }}</span>
+              <div class="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                <div class="h-full rounded-full" :class="w >= 0 ? 'bg-rose-500' : 'bg-emerald-500'"
+                  :style="{ width: `${(Math.abs(w) / maxWeight) * 100}%` }" />
+              </div>
+              <span class="text-2xs tabular-nums w-10 text-right" :class="w >= 0 ? 'text-rose-600' : 'text-emerald-600'">
+                {{ w >= 0 ? '+' : '' }}{{ w.toFixed(2) }}
+              </span>
+            </div>
+          </div>
+          <div v-else class="text-xs text-slate-400">No feedback yet — confirm or clear cases to start training.</div>
+        </div>
+      </div>
+      <p class="text-2xs text-slate-400 mt-3">
+        Positive weight (red) pushes toward fraud, negative (green) toward legitimate. Updated live as analysts review cases.
+      </p>
+    </div>
+
     <!-- Decision breakdown -->
     <div class="rounded-xl bg-white border border-slate-200 p-4">
       <div class="text-sm font-medium text-slate-700 mb-3">Decision breakdown</div>
